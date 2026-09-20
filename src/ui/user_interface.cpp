@@ -61,18 +61,17 @@ void user_interface_t::open_file() {
     if (path.isEmpty())
         return;
 
-    if (!engine_ || !engine_->load(path.toLocal8Bit().constData())) {
+    if (!engine_)
+        return;
+
+    engine_->set_logger([this](const std::string& message) {
+        log(QString::fromStdString(message));
+    });
+
+    if (!engine_->load(path.toLocal8Bit().constData())) {
         statusBar()->showMessage("failed to open: " + path);
         return;
     }
-
-    log(QStringLiteral("analyzing file: \'%1\'").arg(path));
-
-    log(QStringLiteral("format: %1\narch: %2\nbitness: %3\nendianness: %4")
-        .arg((int)engine_->format())
-        .arg((int)engine_->architecture())
-        .arg((int)engine_->bitness())
-        .arg((int)engine_->endianness()));
 
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
     statusBar()->showMessage("opened: " + path);

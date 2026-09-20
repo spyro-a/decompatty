@@ -4,6 +4,7 @@
 #include <format/binary_format.hpp>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -20,6 +21,9 @@ public:
     analysis_engine_t& operator=(const analysis_engine_t&) = delete;
 
     bool load(const char* path);
+
+    void set_logger(log_sink_t logger) noexcept { logger_ = std::move(logger); }
+    const log_sink_t& logger() const noexcept { return logger_; }
 
     const binary_file_t* binary() const noexcept { return binary_.get(); }
     bool has_binary() const noexcept { return binary_ != nullptr; }
@@ -42,4 +46,5 @@ public:
 private:
     std::unique_ptr<binary_file_t> binary_;
     std::vector<function_t> functions_;
+    log_sink_t logger_;
 };

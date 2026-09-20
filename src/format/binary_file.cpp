@@ -8,11 +8,12 @@
 
 #include <utility>
 
-binary_file_t::binary_file_t(std::vector<std::byte> data)
+binary_file_t::binary_file_t(std::vector<std::byte> data, log_sink_t logger)
     : data_(std::move(data)),
-      reader_(data_) {}
+      reader_(data_),
+      logger_(std::move(logger)) {}
 
-std::unique_ptr<binary_file_t> open_binary(const char* path) {
+std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger) {
     auto data = utils::load_file(path);
 
     if (!data || data->size() < sizeof(std::uint32_t)) // magic is usually 4 bytes
@@ -23,7 +24,7 @@ std::unique_ptr<binary_file_t> open_binary(const char* path) {
 
     switch (magic) {
         case FORMAT_ELF:
-            return std::make_unique<elf_file_t>(std::move(*data));
+            return std::make_unique<elf_file_t>(std::move(*data), std::move(logger));
 
         case FORMAT_MACHO_32_BE:
         case FORMAT_MACHO_32_LE:
@@ -31,14 +32,14 @@ std::unique_ptr<binary_file_t> open_binary(const char* path) {
         case FORMAT_MACHO_64_LE:
         case FORMAT_MACHO_FAT_BE:
         case FORMAT_MACHO_FAT_LE:
-            return std::make_unique<macho_file_t>(std::move(*data));
+            return std::make_unique<macho_file_t>(std::move(*data), std::move(logger));
 
         default:
             break;
     }
 
     if (static_cast<std::uint16_t>(magic >> 16) == FORMAT_PE)
-        return std::make_unique<pe_file_t>(std::move(*data));
+        return std::make_unique<pe_file_t>(std::move(*data), std::move(logger));
 
     return nullptr;
 }

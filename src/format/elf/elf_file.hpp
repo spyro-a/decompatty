@@ -4,7 +4,7 @@
 
 class elf_file_t : public binary_file_t {
 public:
-    explicit elf_file_t(std::vector<std::byte> data);
+    explicit elf_file_t(std::vector<std::byte> data, log_sink_t logger = {});
 
     void analyze() override;
     
