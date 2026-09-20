@@ -1,0 +1,162 @@
+QMainWindow::separator
+{
+    width: 4px;
+    height: 4px;
+}
+
+QMenuBar::item
+{
+    background: transparent;
+    padding: 4px 10px;
+}
+
+QMenu
+{
+    padding: 4px 0;
+}
+
+QMenu::item
+{
+    background: transparent;
+    padding: 4px 28px 4px 24px;
+}
+
+QMenu::separator
+{
+    height: 1px;
+    margin: 4px 8px;
+}
+
+QToolBar
+{
+    border: none;
+    spacing: 3px;
+    padding: 3px;
+}
+
+QToolBar::separator
+{
+    width: 1px;
+    margin: 4px;
+}
+
+QToolButton
+{
+    border-radius: 3px;
+    padding: 4px;
+}
+
+QStatusBar::item
+{
+    border: none;
+}
+
+QDockWidget
+{
+    border: none;
+}
+
+QDockWidget::title
+{
+    padding: 5px 8px;
+}
+
+QDockWidget::close-button,
+QDockWidget::float-button
+{
+    border: none;
+    padding: 1px;
+}
+
+QTabWidget::pane
+{
+    top: -1px;
+}
+
+QTabBar
+{
+    qproperty-drawBase: 0;
+}
+
+QTabBar::tab
+{
+    margin-right: 2px;
+    padding: 5px 14px;
+}
+
+QTreeView,
+QTreeWidget,
+QListView
+{
+    outline: 0;
+}
+
+QTreeView::item,
+QTreeWidget::item
+{
+    padding: 3px 4px;
+}
+
+QTreeView::branch
+{
+    background: transparent;
+}
+
+QHeaderView::section
+{
+    padding: 4px 8px;
+    border: none;
+}
+
+QPlainTextEdit,
+QTextEdit
+{
+    border: none;
+}
+
+QScrollBar
+{
+    margin: 0;
+    border: none;
+}
+
+QScrollBar:vertical
+{
+    width: 12px;
+}
+
+QScrollBar:horizontal
+{
+    height: 12px;
+}
+
+QScrollBar::handle
+{
+    border-radius: 4px;
+    margin: 1px;
+}
+
+QScrollBar::handle:vertical
+{
+    min-height: 24px;
+}
+
+QScrollBar::handle:horizontal
+{
+    min-width: 24px;
+}
+
+QScrollBar::sub-line,
+QScrollBar::add-line
+{
+    width: 0;
+    height: 0;
+    background: none;
+    border: none;
+}
+
+QScrollBar::add-page,
+QScrollBar::sub-page
+{
+    background: none;
+}
