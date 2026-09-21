@@ -1,21 +1,18 @@
-#include "format/binary_format.hpp"
+#include "format/binary_reader.hpp"
 #include <format/macho/macho_file.hpp>
 
 #include <cstdio>
+#include <exception>
 #include <string>
 #include <utility>
 
-namespace {
-    std::string hex(std::uint32_t value) {
-        char buffer[16];
-        std::snprintf(buffer, sizeof(buffer), "%08X", value);
-        return buffer;
-    }
-}
-
 macho_file_t::macho_file_t(std::vector<std::byte> data, log_sink_t logger)
     : binary_file_t(std::move(data), std::move(logger)) {
-    parse_header();
+    try {
+        parse_header();
+    } catch (const std::exception& error) {
+        log("mach-o parse aborted: %s", error.what());
+    }
 }
 
 void macho_file_t::analyze() {
@@ -24,6 +21,7 @@ void macho_file_t::analyze() {
 
 void macho_file_t::parse_header() {
     format_ = binary_format_t::macho;
+    log("Mach-O binary detected");
     parse_macho(reader_.magic());
 }
 
@@ -50,7 +48,7 @@ void macho_file_t::parse_macho(std::uint32_t magic) {
             break;
 
         default:
-            log("mach-o magic unknown: 0x" + hex(magic));
+            log("Mach-O magic unknown: 0x%08X", magic);
             return;
     }
 
@@ -69,15 +67,86 @@ void macho_file_t::parse_macho(std::uint32_t magic) {
 
     reader_.skip(sizeof(std::uint32_t)); // cpu subtype
     reader_.skip(sizeof(std::uint32_t)); // file type
-    reader_.skip(sizeof(std::uint32_t)); // # of load commands
-    reader_.skip(sizeof(std::uint32_t)); // size of load commands
+    std::uint32_t load_command_count = reader_.u32();
+    std::uint32_t load_command_size = reader_.u32();
     reader_.skip(sizeof(std::uint32_t)); // flags
 
     if (bitness_ == bitness_t::bits_64)
         reader_.skip(sizeof(std::uint32_t)); // reserved for 64-bit binaries
 
-    log("mach-o header parsed (bitness: " + std::to_string(static_cast<int>(bitness_)) +
-        ", endianness: " + std::to_string(static_cast<int>(endianness_)) + ")");
-    log("cpu type: 0x" + hex(cpu));
-    log("load commands begin at offset: " + std::to_string(reader_.position()));
+    const std::size_t load_commands_begin = reader_.tell();
+    const std::size_t load_commands_end = load_commands_begin + load_command_size;
+
+    for (std::uint32_t i = 0; i < load_command_count; i++) {
+        const auto start = reader_.tell();
+
+        if (start + sizeof(macho_load_command_t) > load_commands_end) {
+            log("load command %u runs past the load command region", i);
+            return;
+        }
+
+        macho_load_command_t cmd;
+        cmd.type = static_cast<load_command_type_t>(reader_.u32());
+        cmd.size = reader_.u32();
+
+        const bool necessary_to_run = static_cast<std::uint32_t>(cmd.type) & req_dyld_mask;
+
+        if (cmd.size < sizeof(macho_load_command_t) || start + cmd.size > load_commands_end) {
+            log("invalid load command size 0x%08X at offset 0x%zx", cmd.size, start);
+            return;
+        }
+
+        // handle each command here
+        switch (cmd.type) {
+            case load_command_type_t::segment_64:
+                parse_segment_64();
+                break;
+
+            default:
+                break;
+        }
+
+        reader_.seek(start + cmd.size);
+    }
+}
+
+void macho_file_t::parse_segment_64() {
+    segment_command_64_t segment;
+    segment.segment_name = reader_.string(16);
+    segment.address = reader_.u64();
+    segment.address_size = reader_.u64();
+    segment.file_offset = reader_.u64();
+    segment.file_size = reader_.u64();
+    segment.max_protections = reader_.u32();
+    segment.initial_protections = reader_.u32();
+    segment.section_count = reader_.u32();
+    segment.flags = reader_.u32();
+
+    log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
+    
+    segments_.push_back(std::move(segment));
+
+    for (std::uint32_t i = 0; i < segment.section_count; ++i) {
+        parse_section_64(segment);
+    }
+}
+
+void macho_file_t::parse_section_64(segment_command_64_t& segment) {
+    segment_section_64_t section;
+    section.section_name = reader_.string(16);
+    section.segment_name = reader_.string(16);
+    section.address = reader_.u64();
+    section.size = reader_.u64();
+    section.file_offset = reader_.u32();
+    section.alignment = reader_.u32();
+    section.relocation_offset = reader_.u32();
+    section.relocation_count = reader_.u32();
+    section.flags = reader_.u32();
+    section.reserved1 = reader_.u32();
+    section.reserved2 = reader_.u32();
+    section.reserved3 = reader_.u32();
+
+    log("    %s: 0x%llx", section.section_name.c_str(), section.address);
+    
+    sections_.push_back(std::move(section));
 }

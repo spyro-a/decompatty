@@ -132,16 +132,16 @@ QTabBar::tab
 
 QTabBar::tab:selected
 {
-    background: #1e1e1e;
+    background: #3f3f46;
     color: #ffffff;
     border-top: 2px solid #007acc;
 }
 
-QTabBar::tab:hover:!selected
+/* QTabBar::tab:hover:!selected
 {
     background: #383838;
     color: #ffffff;
-}
+} */
 
 QTreeView,
 QTreeWidget,

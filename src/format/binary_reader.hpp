@@ -48,6 +48,7 @@ public:
     std::uint64_t u64();
 
     std::span<const std::byte> bytes(std::size_t n);
+    std::string string(std::size_t n);
 
     std::uint32_t magic() const;
 
@@ -56,7 +57,7 @@ public:
 
     void seek(std::size_t offset) noexcept;
     void skip(std::size_t n);
-    std::size_t position() const noexcept;
+    std::size_t tell() const noexcept;
     std::size_t remaining() const noexcept;
 
     bool can_read(std::size_t n) const noexcept;

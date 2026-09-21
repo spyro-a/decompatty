@@ -1,8 +1,11 @@
 #pragma once
 
+#include <cstdarg>
 #include <cstddef>
+#include <cstdio>
 #include <functional>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -20,15 +23,29 @@ public:
     bitness_t bitness() const noexcept { return bitness_; }
     endianness_t endianness() const noexcept { return endianness_; }
 
+    std::span<const std::byte> data() const noexcept { return data_; }
+    std::size_t size() const noexcept { return data_.size(); }
+
 protected:
     explicit binary_file_t(std::vector<std::byte> data, log_sink_t logger = {});
 
     virtual void parse_header() = 0;
     virtual void analyze() = 0;
 
-    void log(const std::string& message) {
-        if (logger_)
-            logger_(message);
+    void log(const char* format, ...) const
+        __attribute__((format(printf, 2, 3))) {
+        if (!logger_)
+            return;
+
+        va_list args;
+        va_start(args, format);
+
+        char buffer[2048];
+        std::vsnprintf(buffer, sizeof(buffer), format, args);
+
+        va_end(args);
+
+        logger_(buffer);
     }
 
     std::vector<std::byte> data_;

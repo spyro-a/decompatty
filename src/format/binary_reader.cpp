@@ -16,6 +16,15 @@ std::span<const std::byte> binary_reader_t::bytes(std::size_t n) {
     return result;
 }
 
+std::string binary_reader_t::string(std::size_t n) {
+    const auto data = bytes(n);
+
+    const auto* begin = reinterpret_cast<const char*>(data.data());
+    const auto* end = begin + data.size();
+
+    return std::string(begin, std::find(begin, end, '\0'));
+}
+
 std::uint32_t binary_reader_t::magic() const {
     if (data.size() < sizeof(std::uint32_t))
         throw std::out_of_range("binary_reader_t: not enough data for a magic");
@@ -47,7 +56,7 @@ void binary_reader_t::skip(std::size_t n) {
     offset += n;
 }
 
-std::size_t binary_reader_t::position() const noexcept {
+std::size_t binary_reader_t::tell() const noexcept {
     return offset;
 }
 

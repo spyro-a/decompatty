@@ -1,4 +1,6 @@
+#include "ui/views/disassembly_view.hpp"
 #include <QtGui/qaction.h>
+#include <QtWidgets/qwidget.h>
 #include <core/analysis_engine.hpp>
 
 #include <ui/user_interface.hpp>
@@ -49,7 +51,7 @@ bool user_interface_t::setup(const char* app_name, int width, int height) {
     return true;
 }
 
-std::unordered_map<QString, QPlainTextEdit*>& user_interface_t::views() {
+std::unordered_map<QString, QWidget*>& user_interface_t::views() {
     return views_;
 }
 
@@ -73,28 +75,57 @@ void user_interface_t::open_file() {
         return;
     }
 
+    functions_dock->show();
+    main_views->tabBar()->show();
+
+    if (auto* view = show_disassembly_view(); view && engine_->has_binary())
+        view->set_binary(*engine_->binary());
+
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
     statusBar()->showMessage("opened: " + path);
 }
 
-QPlainTextEdit* user_interface_t::add_view(const QString& title, const QString& text) {
-    auto* view = new QPlainTextEdit(main_views);
-    view->setObjectName("code_view");
-    view->setReadOnly(true);
+disassembly_view_t* user_interface_t::show_disassembly_view() {
+    if (disassembly_view_)
+        return disassembly_view_;
 
+    if (auto* placeholder = main_views->widget(0);
+        placeholder && placeholder->objectName() == "intro_label") {
+        main_views->removeTab(0);
+        placeholder->deleteLater();
+    }
+
+    disassembly_view_ = new disassembly_view_t(this);
+    disassembly_view_->setObjectName("disassembly_view");
+
+    main_views->addTab(disassembly_view_, "Disassembly");
+    main_views->setCurrentWidget(disassembly_view_);
+
+    views_["disassembly_view"] = disassembly_view_;
+
+    return disassembly_view_;
+}
+
+QWidget* user_interface_t::add_view(const QString& title, const QString& id) {
+    auto* widget = new QWidget(this);
+    widget->setObjectName(id);
+
+    auto* text_edit = new QPlainTextEdit(widget);
     auto font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
     font.setPointSize(12);
-    view->setFont(font);
+    text_edit->setFont(font);
+    text_edit->setReadOnly(true);
 
-    view->setPlainText(text);
+    auto* layout = new QVBoxLayout(widget);
+    layout->setContentsMargins(0, 0, 0, 0);
+    layout->addWidget(text_edit);
 
-    main_views->addTab(view, title);
-    main_views->setCurrentWidget(view);
+    main_views->addTab(widget, title);
+    main_views->setCurrentWidget(widget);
 
-    views_[title] = view;
+    views_[id] = widget;
 
-    return view;
-
+    return widget;
 }
 
 void user_interface_t::execute_command() {
@@ -121,8 +152,6 @@ void user_interface_t::setup_ui() {
     setup_function_list();
     setup_main_views();
     setup_output();
-
-    log("decompatty ready");
 }
 
 void user_interface_t::setup_menus() {
@@ -147,15 +176,10 @@ void user_interface_t::setup_menus() {
     QAction* open_disassembly_action = new QAction("&Disassembly View");
     open_view_menu->addAction(open_disassembly_action);
     connect(open_disassembly_action, &QAction::triggered, this, [this] {
-        if (auto* placeholder = main_views->widget(0);
-            placeholder && placeholder->objectName() == "intro_label") {
-            main_views->removeTab(0);
-            placeholder->deleteLater();
-        }
-
         main_views->tabBar()->show();
 
-        add_view("Disassembly", "WIP");
+        if (auto* view = show_disassembly_view(); view && engine_->has_binary())
+            view->set_binary(*engine_->binary());
     });
 }
 
@@ -178,7 +202,7 @@ void user_interface_t::setup_toolbar() {
 }
 
 void user_interface_t::setup_function_list() {
-    QDockWidget* functions_dock = new QDockWidget("Functions", this);
+    functions_dock = new QDockWidget("Functions", this);
     functions_dock->setObjectName("functions_dock");
     functions_dock->setAllowedAreas(
         Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
@@ -191,6 +215,7 @@ void user_interface_t::setup_function_list() {
     function_list->setSortingEnabled(true);
 
     functions_dock->setWidget(function_list);
+    functions_dock->hide();
 
     addDockWidget(Qt::LeftDockWidgetArea, functions_dock);
     resizeDocks({functions_dock}, {width() / 5}, Qt::Horizontal);
@@ -202,12 +227,13 @@ void user_interface_t::setup_main_views() {
     main_views->setDocumentMode(true);
     main_views->setMovable(true);
     main_views->setTabsClosable(true);
-    main_views->tabBar()->hide();
 
     auto* label = new QLabel("open a file to disassemble it", main_views);
     label->setObjectName("intro_label");
     label->setAlignment(Qt::AlignCenter);
     main_views->addTab(label, "decompatty");
+    main_views->tabBar()->setExpanding(true);
+    main_views->tabBar()->hide();
 
     setCentralWidget(main_views);
 }
@@ -236,14 +262,14 @@ void user_interface_t::setup_output() {
     dock->setWidget(container);
     addDockWidget(Qt::BottomDockWidgetArea, dock);
 
-    resizeDocks({dock}, {height() / 5}, Qt::Vertical);
+    resizeDocks({dock}, {height() / 3}, Qt::Vertical);
 }
 
 void user_interface_t::log(const QString& message) {
     if (!output)
         return;
 
-    output->appendPlainText(message + '\n');
+    output->appendPlainText(message);
 }
 
 void user_interface_t::apply_theme() {

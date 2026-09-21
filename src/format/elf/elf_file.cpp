@@ -13,4 +13,5 @@ void elf_file_t::analyze() {
 
 void elf_file_t::parse_header() {
     format_ = binary_format_t::elf;
+    log("ELF binary detected");
 }

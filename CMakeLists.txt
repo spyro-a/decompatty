@@ -13,6 +13,7 @@ set(DECOMPATTY_SOURCES
     src/core/app.cpp
     src/core/analysis_engine.cpp
     src/ui/user_interface.cpp
+    src/ui/views/disassembly_view.cpp
     src/utils/utils.cpp
     src/main.cpp
 )
