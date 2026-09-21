@@ -31,3 +31,8 @@ cmake --build build
 
 Inside the app, use **File > Open** (or Ctrl+O / Cmd+O) to load a binary.
 Open views from **View > Open View**
+
+## Screenshots
+
+### Strings view
+![Strings view](docs/screenshots/strings.png)
