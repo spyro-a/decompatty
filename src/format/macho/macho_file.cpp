@@ -98,8 +98,14 @@ void macho_file_t::parse_macho(std::uint32_t magic) {
 
         // handle each command here
         switch (cmd.type) {
+            // provides segments + sections
             case load_command_type_t::segment_64:
                 parse_segment_64();
+                break;
+
+            // symbol table, size == 24
+            case load_command_type_t::sym_tab:
+                parse_symtab();
                 break;
 
             default:
@@ -149,4 +155,48 @@ void macho_file_t::parse_section_64(segment_command_64_t& segment) {
     log("    %s: 0x%llx", section.section_name.c_str(), section.address);
     
     sections_.push_back(std::move(section));
+}
+
+void macho_file_t::parse_symtab() {
+    symbol_table_command_t table;
+    table.symbols_offset = reader_.u32();
+    table.symbol_count = reader_.u32();
+    table.strings_offset = reader_.u32();
+    table.strings_size = reader_.u32();
+
+    log("%u symbols, %u string bytes", table.symbol_count, table.strings_size);
+
+     // we are at the start of the next LOAD command
+    const auto command_end = reader_.tell();
+
+    // jump to string table
+    reader_.seek(table.strings_offset);
+    const auto string_table = reader_.bytes(table.strings_size);
+
+    // read symbols
+    reader_.seek(table.symbols_offset);
+
+    for (std::uint32_t i = 0; i < table.symbol_count; ++i) {
+        symbol_t symbol;
+
+        std::uint32_t string_index = reader_.u32();
+        symbol.type = reader_.u8();
+        symbol.section = reader_.u8();
+        symbol.description = reader_.u16();
+        symbol.address = reader_.u64();
+
+        if (string_index >= string_table.size())
+            continue;
+
+        const char* str = reinterpret_cast<const char*>(string_table.data() + string_index);
+
+        symbol.name = str;
+
+        log("symbol: %s", symbol.name.c_str());
+
+        symbols_.push_back(std::move(symbol));
+    }
+    
+    // jump back to start of the next LOAD command
+    reader_.seek(command_end);
 }

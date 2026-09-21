@@ -98,6 +98,22 @@ struct segment_section_64_t {
     std::uint32_t reserved3;
 };
 
+struct symbol_table_command_t {
+    std::uint32_t symbols_offset;
+    std::uint32_t symbol_count;
+    std::uint32_t strings_offset;
+    std::uint32_t strings_size;
+};
+
+struct symbol_t {
+    std::string name;
+    std::uint64_t address;
+
+    std::uint8_t type;
+    std::uint8_t section;
+    std::uint16_t description;
+};
+
 class macho_file_t : public binary_file_t {
 public:
     explicit macho_file_t(std::vector<std::byte> data, log_sink_t logger = {});
@@ -108,10 +124,14 @@ private:
     std::vector<segment_command_64_t> segments_;
     std::vector<segment_section_64_t> sections_;
 
+    std::vector<symbol_t> symbols_;
+
     void parse_header() override;
     void parse_macho(std::uint32_t magic);
 
-    // LOAD command handling
+    // LOAD command parsers
     void parse_segment_64();
     void parse_section_64(segment_command_64_t& segment);
+
+    void parse_symtab();
 };
