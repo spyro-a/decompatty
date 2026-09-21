@@ -2,7 +2,7 @@
 
 #include <ui/user_interface.hpp>
 
-app_t::app_t(int argc, char* argv[])
+app_t::app_t(int& argc, char* argv[])
     : qt_app(argc, argv),
       ui(std::make_unique<user_interface_t>()) {}
 

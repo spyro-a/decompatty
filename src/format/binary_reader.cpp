@@ -25,6 +25,13 @@ std::string binary_reader_t::string(std::size_t n) {
     return std::string(begin, std::find(begin, end, '\0'));
 }
 
+std::span<const std::byte> binary_reader_t::read_at(std::size_t offset, std::size_t size) {
+    if (offset > data.size() || size > data.size() - offset)
+        throw std::out_of_range("binary_reader_t: read past end of data");
+
+    return data.subspan(offset, size);
+}
+
 std::uint32_t binary_reader_t::magic() const {
     if (data.size() < sizeof(std::uint32_t))
         throw std::out_of_range("binary_reader_t: not enough data for a magic");

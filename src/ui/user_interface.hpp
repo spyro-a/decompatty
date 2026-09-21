@@ -1,5 +1,6 @@
 #pragma once
 
+#include "ui/views/strings_view.hpp"
 #include <QMainWindow>
 
 class QDockWidget;
@@ -30,8 +31,11 @@ private slots:
 
     void execute_command();
 
+    void close_tab(int index);
+
 private:
     disassembly_view_t* show_disassembly_view();
+    strings_view_t* show_strings_view();
 
     void setup_ui();
     void setup_menus();
@@ -53,6 +57,7 @@ private:
     std::unordered_map<QString, QWidget*> views_;
 
     disassembly_view_t* disassembly_view_ = nullptr;
+    strings_view_t* strings_view_ = nullptr;
 
     analysis_engine_t* engine_ = nullptr;
 };

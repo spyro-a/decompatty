@@ -49,6 +49,7 @@ public:
 
     std::span<const std::byte> bytes(std::size_t n);
     std::string string(std::size_t n);
+    std::span<const std::byte> read_at(std::size_t offset, std::size_t size);
 
     std::uint32_t magic() const;
 

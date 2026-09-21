@@ -12,6 +12,20 @@
 #include <format/binary_format.hpp>
 #include <format/binary_reader.hpp>
 
+struct symbol_t {
+    std::string name;
+    std::uint64_t address;
+    std::uint8_t type;
+    std::uint8_t section;
+    std::uint16_t description;
+};
+
+struct string_t {
+    std::string value;
+    std::uint64_t address;
+    std::uint64_t file_offset;
+};
+
 using log_sink_t = std::function<void(const std::string&)>;
 
 class binary_file_t {
@@ -22,6 +36,9 @@ public:
     cpu_type_t architecture() const noexcept { return architecture_; }
     bitness_t bitness() const noexcept { return bitness_; }
     endianness_t endianness() const noexcept { return endianness_; }
+
+    virtual const std::vector<string_t>& strings() const = 0;
+    virtual const std::vector<symbol_t>& symbols() const = 0;
 
     std::span<const std::byte> data() const noexcept { return data_; }
     std::size_t size() const noexcept { return data_.size(); }

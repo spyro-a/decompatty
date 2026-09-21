@@ -9,7 +9,7 @@ class user_interface_t;
 
 class app_t {
 public:
-    app_t(int argc, char* argv[]);
+    app_t(int& argc, char* argv[]);
     ~app_t();
     
     int run();

@@ -152,9 +152,37 @@ void macho_file_t::parse_section_64(segment_command_64_t& segment) {
     section.reserved2 = reader_.u32();
     section.reserved3 = reader_.u32();
 
-    log("    %s: 0x%llx", section.section_name.c_str(), section.address);
+    if (section.file_offset != 0 && section.size != 0)
+        section.data = reader_.read_at(section.file_offset, section.size);
+
+    if (section.section_name == "__cstring")
+        parse_cstrings(section);
+
+    log("  %s: 0x%llx", section.section_name.c_str(), section.address);
     
     sections_.push_back(std::move(section));
+}
+
+void macho_file_t::parse_cstrings(segment_section_64_t& section) {
+    std::size_t start = 0;
+
+    for (std::size_t i = 0; i < section.data.size(); ++i) {
+        if (section.data[i] != std::byte{0})
+            continue;
+
+        if (i > start) {
+            string_t string;
+
+            string.value = std::string(reinterpret_cast<const char*>(section.data.data() + start), i - start);
+
+            string.address = section.address + start;
+            string.file_offset = section.file_offset + start;
+
+            strings_.push_back(std::move(string));
+        }
+
+        start = i + 1;
+    }
 }
 
 void macho_file_t::parse_symtab() {
@@ -189,10 +217,7 @@ void macho_file_t::parse_symtab() {
             continue;
 
         const char* str = reinterpret_cast<const char*>(string_table.data() + string_index);
-
         symbol.name = str;
-
-        log("symbol: %s", symbol.name.c_str());
 
         symbols_.push_back(std::move(symbol));
     }

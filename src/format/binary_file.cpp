@@ -24,7 +24,8 @@ std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger) 
 
     switch (magic) {
         case FORMAT_ELF:
-            return std::make_unique<elf_file_t>(std::move(*data), std::move(logger));
+            // return std::make_unique<elf_file_t>(std::move(*data), std::move(logger));
+            break;
 
         case FORMAT_MACHO_32_BE:
         case FORMAT_MACHO_32_LE:
@@ -38,8 +39,8 @@ std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger) 
             break;
     }
 
-    if (static_cast<std::uint16_t>(magic >> 16) == FORMAT_PE)
-        return std::make_unique<pe_file_t>(std::move(*data), std::move(logger));
+    // if (static_cast<std::uint16_t>(magic >> 16) == FORMAT_PE)
+        // return std::make_unique<pe_file_t>(std::move(*data), std::move(logger));
 
     return nullptr;
 }

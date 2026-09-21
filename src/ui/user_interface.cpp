@@ -1,4 +1,6 @@
+#include "format/binary_file.hpp"
 #include "ui/views/disassembly_view.hpp"
+#include "ui/views/strings_view.hpp"
 #include <QtGui/qaction.h>
 #include <QtWidgets/qwidget.h>
 #include <core/analysis_engine.hpp>
@@ -78,9 +80,6 @@ void user_interface_t::open_file() {
     functions_dock->show();
     main_views->tabBar()->show();
 
-    if (auto* view = show_disassembly_view(); view && engine_->has_binary())
-        view->set_binary(*engine_->binary());
-
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
     statusBar()->showMessage("opened: " + path);
 }
@@ -104,6 +103,25 @@ disassembly_view_t* user_interface_t::show_disassembly_view() {
     views_["disassembly_view"] = disassembly_view_;
 
     return disassembly_view_;
+}
+
+strings_view_t* user_interface_t::show_strings_view() {
+    if (strings_view_)
+        return strings_view_;
+
+    if (!engine_ || !engine_->has_binary())
+        return nullptr;
+
+    strings_view_ = new strings_view_t(engine_->binary()->strings(), this);
+    strings_view_->setObjectName("strings_view");
+
+    main_views->addTab(strings_view_, "Strings");
+    main_views->setCurrentWidget(strings_view_);
+    main_views->tabBar()->show();
+
+    views_["strings_view"] = strings_view_;
+
+    return strings_view_;
 }
 
 QWidget* user_interface_t::add_view(const QString& title, const QString& id) {
@@ -176,10 +194,14 @@ void user_interface_t::setup_menus() {
     QAction* open_disassembly_action = new QAction("&Disassembly View");
     open_view_menu->addAction(open_disassembly_action);
     connect(open_disassembly_action, &QAction::triggered, this, [this] {
-        main_views->tabBar()->show();
+        // TODO: implement
+    });
 
-        if (auto* view = show_disassembly_view(); view && engine_->has_binary())
-            view->set_binary(*engine_->binary());
+    QAction* open_strings_action = new QAction("&Strings View");
+    open_view_menu->addAction(open_strings_action);
+    connect(open_strings_action, &QAction::triggered, this, [this] {
+        if (!show_strings_view())
+            log("open a file before opening the strings view");
     });
 }
 
@@ -227,6 +249,7 @@ void user_interface_t::setup_main_views() {
     main_views->setDocumentMode(true);
     main_views->setMovable(true);
     main_views->setTabsClosable(true);
+    connect(main_views, &QTabWidget::tabCloseRequested, this, &user_interface_t::close_tab);
 
     auto* label = new QLabel("open a file to disassemble it", main_views);
     label->setObjectName("intro_label");
@@ -263,6 +286,25 @@ void user_interface_t::setup_output() {
     addDockWidget(Qt::BottomDockWidgetArea, dock);
 
     resizeDocks({dock}, {height() / 3}, Qt::Vertical);
+}
+
+void user_interface_t::close_tab(int index) {
+    QWidget* widget = main_views->widget(index);
+    if (!widget)
+        return;
+
+    main_views->removeTab(index);
+    widget->deleteLater();
+
+    views_.erase(widget->objectName());
+
+    if (widget == disassembly_view_)
+        disassembly_view_ = nullptr;
+    else if (widget == strings_view_)
+        strings_view_ = nullptr;
+
+    if (main_views->count() == 0)
+        main_views->tabBar()->hide();
 }
 
 void user_interface_t::log(const QString& message) {
