@@ -2,7 +2,7 @@
 
 #include <format/binary_file.hpp>
 
-#include <QtWidgets/qwidget.h>
+#include <QWidget>
 #include <QTreeWidgetItem>
 
 #include <vector>

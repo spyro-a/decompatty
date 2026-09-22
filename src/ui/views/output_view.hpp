@@ -1,8 +1,8 @@
 #pragma once
 
 #include <QDockWidget>
-#include <QtWidgets/qlineedit.h>
-#include <QtWidgets/qplaintextedit.h>
+#include <QLineEdit>
+#include <QPlainTextEdit>
 
 class output_view_t : public QDockWidget {
     Q_OBJECT

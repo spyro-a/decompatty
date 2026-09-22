@@ -1,9 +1,8 @@
-#include "ui/views/disassembly_view.hpp"
+#include <QVBoxLayout>
 
 #include <format/binary_format.hpp>
 
-#include <QVBoxLayout>
-
+#include <ui/views/disassembly_view.hpp>
 
 namespace {
     const char* format_name(binary_format_t format) {

@@ -43,6 +43,14 @@ public:
     std::span<const std::byte> data() const noexcept { return data_; }
     std::size_t size() const noexcept { return data_.size(); }
 
+    const std::uint64_t image_base() const noexcept {
+        return image_base_;
+    }
+
+    const std::uint64_t image_end() const noexcept {
+        return image_end_;
+    }
+
 protected:
     explicit binary_file_t(std::vector<std::byte> data, log_sink_t logger = {});
 
@@ -67,6 +75,9 @@ protected:
 
     std::vector<std::byte> data_;
     binary_reader_t reader_;
+
+    std::uint64_t image_base_ = UINT64_MAX;
+    std::uint64_t image_end_ = 0;
 
     binary_format_t format_ = binary_format_t::unknown;
     cpu_type_t architecture_ = cpu_type_t::unknown;

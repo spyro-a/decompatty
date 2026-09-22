@@ -4,8 +4,6 @@
 
 #include <format/binary_file.hpp>
 
-#include <vector>
-
 class QPlainTextEdit;
 
 class disassembly_view_t : public QWidget {

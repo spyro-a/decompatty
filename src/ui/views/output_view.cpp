@@ -1,14 +1,8 @@
-#include "ui/user_interface.hpp"
-#include <QtCore/qnamespace.h>
-#include <QtGui/qfontdatabase.h>
-#include <QtGui/qicon.h>
-#include <QtWidgets/qlineedit.h>
-#include <QtWidgets/qplaintextedit.h>
-#include <ui/views/output_view.hpp>
-
 #include <QVBoxLayout>
 #include <QDockWidget>
 #include <QScrollBar>
+
+#include <ui/views/output_view.hpp>
 
 output_view_t::output_view_t(const QString& name, QWidget* parent) : QDockWidget(name, parent) {
     auto* container = new QWidget(this);

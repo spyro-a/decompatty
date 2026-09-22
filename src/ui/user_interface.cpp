@@ -1,34 +1,15 @@
-#include "format/binary_file.hpp"
-#include "ui/views/disassembly_view.hpp"
-#include "ui/views/functions_view.hpp"
-#include "ui/views/output_view.hpp"
-#include "ui/views/strings_view.hpp"
-#include <QtCore/qnamespace.h>
-#include <QtCore/qobject.h>
-#include <QtGui/qaction.h>
-#include <QtWidgets/qwidget.h>
+#include "ui/views/hex_view.hpp"
+#include <QFileDialog>
+#include <QStatusBar>
+#include <QMenuBar>
+#include <QToolBar>
+#include <QLabel>
+
 #include <core/analysis_engine.hpp>
 
 #include <ui/user_interface.hpp>
 
 #include <utils/utils.hpp>
-
-#include <QAction>
-#include <QActionGroup>
-#include <QDockWidget>
-#include <QFileDialog>
-#include <QMenu>
-#include <QMenuBar>
-#include <QPlainTextEdit>
-#include <QStatusBar>
-#include <QToolBar>
-#include <QTreeWidget>
-#include <QTreeWidgetItem>
-#include <QBoxLayout>
-#include <QLineEdit>
-#include <QVBoxLayout>
-#include <QLabel>
-
 
 #include <string>
 
@@ -84,6 +65,7 @@ void user_interface_t::open_file() {
     main_views->tabBar()->show();
     
     show_functions_view();
+    show_hex_view();
 
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
     statusBar()->showMessage("Opened: " + path);
@@ -116,6 +98,25 @@ functions_view_t* user_interface_t::show_functions_view() {
     addDockWidget(Qt::LeftDockWidgetArea, functions_view_);
 
     return functions_view_;
+}
+
+hex_view_t* user_interface_t::show_hex_view() {
+    if (hex_view_)
+        return hex_view_;
+
+    if (!engine_ || !engine_->has_binary())
+        return nullptr;
+
+    hex_view_ = new hex_view_t(engine_->binary()->image_base(), engine_->binary()->data(), this);
+    hex_view_->setObjectName("hex_view");
+
+    main_views->addTab(hex_view_, "Hex");
+    main_views->setCurrentWidget(hex_view_);
+    main_views->tabBar()->show();
+
+    views_["hex_view"] = hex_view_;
+
+    return hex_view_;
 }
 
 strings_view_t* user_interface_t::show_strings_view() {
@@ -154,6 +155,16 @@ output_view_t* user_interface_t::show_output_view() {
 void user_interface_t::execute_command(const QString& command) {
     output_view_->append("> " + command);
     output_view_->append(QStringLiteral("'%1' is undefined").arg(command));
+}
+
+void user_interface_t::apply_theme() {
+    std::string sheet = read_theme("themes/base/theme.css");
+    sheet += read_theme("themes/dark/theme.css");
+
+    if (sheet.empty())
+        return;
+
+    setStyleSheet(QString::fromStdString(sheet));
 }
 
 void user_interface_t::setup_ui() {
@@ -269,14 +280,4 @@ void user_interface_t::log(const QString& message) {
         return;
 
     output_view_->append(message);
-}
-
-void user_interface_t::apply_theme() {
-    std::string sheet = read_theme("themes/base/theme.css");
-    sheet += read_theme("themes/dark/theme.css");
-
-    if (sheet.empty())
-        return;
-
-    setStyleSheet(QString::fromStdString(sheet));
 }

@@ -1,5 +1,7 @@
 #include <fstream>
 
+#include <QtCore/qstring.h>
+
 #include <utils/utils.hpp>
 
 std::optional<std::vector<std::byte>> utils::load_file(const char* path) {
@@ -26,4 +28,13 @@ std::optional<std::vector<std::byte>> utils::load_file(const char* path) {
         return std::nullopt;
 
     return data;
+}
+
+QString utils::hex(std::byte value, int width) {
+    return QStringLiteral("%1").arg(
+        std::to_integer<unsigned int>(value),
+        width,
+        16,
+        QChar('0')
+    ).toUpper();
 }

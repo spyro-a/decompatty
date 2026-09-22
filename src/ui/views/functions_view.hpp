@@ -1,8 +1,9 @@
 #pragma once
 
 #include <QDockWidget>
-#include <QtWidgets/qlineedit.h>
-#include <QtWidgets/qtreewidget.h>
+
+class QLineEdit;
+class QTreeWidget;
 
 class functions_view_t : public QDockWidget {
     Q_OBJECT

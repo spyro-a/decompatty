@@ -1,5 +1,6 @@
-#include <QtWidgets/qboxlayout.h>
-#include <QtWidgets/qtreewidget.h>
+#include <QVBoxLayout>
+#include <QLineEdit>
+#include <QTreeWidget>
 
 #include <ui/views/functions_view.hpp>
 

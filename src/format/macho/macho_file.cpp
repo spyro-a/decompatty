@@ -115,6 +115,8 @@ void macho_file_t::parse_macho(std::uint32_t magic) {
 
         reader_.seek(start + cmd.size);
     }
+
+    log("image base: 0x%llx\nimage end: 0x%llx", image_base(), image_end());
 }
 
 void macho_file_t::parse_segment_64() {
@@ -132,6 +134,11 @@ void macho_file_t::parse_segment_64() {
     log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
     
     segments_.push_back(std::move(segment));
+
+    if (segment.file_size != 0 && segment.address_size != 0) {
+        image_base_ = std::min(image_base_, segment.address);
+        image_end_ = std::max(image_end_, segment.address + segment.address_size);
+    }
 
     for (std::uint32_t i = 0; i < segment.section_count; ++i) {
         parse_section_64(segment);

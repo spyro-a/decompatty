@@ -2,20 +2,13 @@
 
 #include <ui/views/disassembly_view.hpp>
 #include <ui/views/functions_view.hpp>
+#include <ui/views/hex_view.hpp>
 #include <ui/views/output_view.hpp>
 #include <ui/views/strings_view.hpp>
 
 #include <QMainWindow>
 
-class QDockWidget;
-class QPlainTextEdit;
-class QTabWidget;
-class QTreeWidget;
-class QString;
-class QLineEdit;
-
 class analysis_engine_t;
-class disassembly_view_t;
 
 class user_interface_t : public QMainWindow {
     Q_OBJECT
@@ -33,9 +26,11 @@ public:
 private:
     disassembly_view_t* show_disassembly_view();
     functions_view_t* show_functions_view();
+    hex_view_t* show_hex_view();
     strings_view_t* show_strings_view();
     output_view_t* show_output_view();
 
+    void apply_theme();
     void setup_ui();
     void setup_menus();
     void setup_toolbar();
@@ -43,7 +38,6 @@ private:
 
     void log(const QString& message);
 
-    void apply_theme();
 
     QTabWidget* main_views = nullptr;
 
@@ -51,6 +45,7 @@ private:
 
     disassembly_view_t* disassembly_view_ = nullptr;
     functions_view_t* functions_view_ = nullptr;
+    hex_view_t* hex_view_ = nullptr;
     output_view_t* output_view_ = nullptr;
     strings_view_t* strings_view_ = nullptr;
 

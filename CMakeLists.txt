@@ -15,6 +15,7 @@ set(DECOMPATTY_SOURCES
     src/ui/user_interface.cpp
     src/ui/views/disassembly_view.cpp
     src/ui/views/functions_view.cpp
+    src/ui/views/hex_view.cpp
     src/ui/views/output_view.cpp
     src/ui/views/strings_view.cpp
     src/utils/utils.cpp
