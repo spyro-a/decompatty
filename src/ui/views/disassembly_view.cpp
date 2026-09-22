@@ -17,8 +17,8 @@ namespace {
 
     const char* cpu_name(cpu_type_t cpu) {
         switch (cpu) {
-            case cpu_type_t::arm: return "ARM";
-            case cpu_type_t::x86: return "x86";
+            case cpu_type_t::arm64: return "ARM";
+            case cpu_type_t::x86_64: return "x86_64";
             case cpu_type_t::power_pc: return "PowerPC";
             case cpu_type_t::risc_v: return "RISC-V";
             case cpu_type_t::mips: return "MIPS";
@@ -45,6 +45,5 @@ namespace {
 }
 
 disassembly_view_t::disassembly_view_t(QWidget* parent) : QWidget(parent) {
-    auto* layout = new QVBoxLayout(this);
-    layout->setContentsMargins(0, 0, 0, 0);
+
 }

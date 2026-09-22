@@ -3,17 +3,9 @@
 #include <format/binary_file.hpp>
 #include <format/binary_format.hpp>
 
-#include <cstdint>
-#include <functional>
+#include <core/disassembler.hpp>
+
 #include <memory>
-#include <string>
-#include <vector>
-
-struct function_t {
-    std::uint64_t address = 0;
-    std::string name;
-};
-
 class analysis_engine_t {
 public:
     analysis_engine_t() = default;
@@ -41,10 +33,8 @@ public:
         return binary_ ? binary_->endianness() : endianness_t::unknown;
     }
 
-    const std::vector<function_t>& functions() const noexcept { return functions_; }
-
 private:
+    // std::unique_ptr<disassembler_t> disassembler_;
     std::unique_ptr<binary_file_t> binary_;
-    std::vector<function_t> functions_;
     log_sink_t logger_;
 };

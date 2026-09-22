@@ -1,3 +1,4 @@
+#include "format/binary_format.hpp"
 #include "format/binary_reader.hpp"
 #include <format/macho/macho_file.hpp>
 
@@ -158,6 +159,9 @@ void macho_file_t::parse_section_64(segment_command_64_t& segment) {
     if (section.section_name == "__cstring")
         parse_cstrings(section);
 
+    if (section.section_name == "__text")
+        parse_text(section);
+
     log("  %s: 0x%llx", section.section_name.c_str(), section.address);
     
     sections_.push_back(std::move(section));
@@ -182,6 +186,18 @@ void macho_file_t::parse_cstrings(segment_section_64_t& section) {
         }
 
         start = i + 1;
+    }
+}
+
+void macho_file_t::parse_text(segment_section_64_t& section) {
+    log("parsing text");
+    switch (architecture_) {
+        case cpu_type_t::arm64:
+            break;
+        case cpu_type_t::x86_64:
+            break;
+        default:
+            break;
     }
 }
 

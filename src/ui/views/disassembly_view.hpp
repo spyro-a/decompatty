@@ -6,8 +6,6 @@
 
 #include <vector>
 
-#include <ui/views/listing.hpp>
-
 class QPlainTextEdit;
 
 class disassembly_view_t : public QWidget {

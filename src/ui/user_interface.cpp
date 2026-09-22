@@ -1,6 +1,10 @@
 #include "format/binary_file.hpp"
 #include "ui/views/disassembly_view.hpp"
+#include "ui/views/functions_view.hpp"
+#include "ui/views/output_view.hpp"
 #include "ui/views/strings_view.hpp"
+#include <QtCore/qnamespace.h>
+#include <QtCore/qobject.h>
 #include <QtGui/qaction.h>
 #include <QtWidgets/qwidget.h>
 #include <core/analysis_engine.hpp>
@@ -77,22 +81,17 @@ void user_interface_t::open_file() {
         return;
     }
 
-    functions_dock->show();
     main_views->tabBar()->show();
+    
+    show_functions_view();
 
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
-    statusBar()->showMessage("opened: " + path);
+    statusBar()->showMessage("Opened: " + path);
 }
 
 disassembly_view_t* user_interface_t::show_disassembly_view() {
     if (disassembly_view_)
         return disassembly_view_;
-
-    if (auto* placeholder = main_views->widget(0);
-        placeholder && placeholder->objectName() == "intro_label") {
-        main_views->removeTab(0);
-        placeholder->deleteLater();
-    }
 
     disassembly_view_ = new disassembly_view_t(this);
     disassembly_view_->setObjectName("disassembly_view");
@@ -103,6 +102,20 @@ disassembly_view_t* user_interface_t::show_disassembly_view() {
     views_["disassembly_view"] = disassembly_view_;
 
     return disassembly_view_;
+}
+
+functions_view_t* user_interface_t::show_functions_view() {
+    if (functions_view_)
+        return functions_view_;
+    
+    functions_view_ = new functions_view_t("Functions", this);
+    functions_view_->setObjectName("functions_view");
+
+    views_["functions_view"] = functions_view_;
+
+    addDockWidget(Qt::LeftDockWidgetArea, functions_view_);
+
+    return functions_view_;
 }
 
 strings_view_t* user_interface_t::show_strings_view() {
@@ -124,38 +137,23 @@ strings_view_t* user_interface_t::show_strings_view() {
     return strings_view_;
 }
 
-QWidget* user_interface_t::add_view(const QString& title, const QString& id) {
-    auto* widget = new QWidget(this);
-    widget->setObjectName(id);
+output_view_t* user_interface_t::show_output_view() {
+    if (output_view_)
+        return output_view_;
 
-    auto* text_edit = new QPlainTextEdit(widget);
-    auto font = QFontDatabase::systemFont(QFontDatabase::FixedFont);
-    font.setPointSize(12);
-    text_edit->setFont(font);
-    text_edit->setReadOnly(true);
+    output_view_ = new output_view_t("Output", this);
+    output_view_->setObjectName("output_view");
 
-    auto* layout = new QVBoxLayout(widget);
-    layout->setContentsMargins(0, 0, 0, 0);
-    layout->addWidget(text_edit);
+    views_["output_view"] = output_view_;
 
-    main_views->addTab(widget, title);
-    main_views->setCurrentWidget(widget);
+    addDockWidget(Qt::BottomDockWidgetArea, output_view_);
 
-    views_[id] = widget;
-
-    return widget;
+    return output_view_;
 }
 
-void user_interface_t::execute_command() {
-    const auto command = input->text();
-
-    if (command.isEmpty())
-        return;
-
-    output->appendPlainText("> " + command);
-    output->appendPlainText(QStringLiteral("\'%1\' is undefined").arg(command));
-
-    input->clear();
+void user_interface_t::execute_command(const QString& command) {
+    output_view_->append("> " + command);
+    output_view_->append(QStringLiteral("'%1' is undefined").arg(command));
 }
 
 void user_interface_t::setup_ui() {
@@ -167,9 +165,7 @@ void user_interface_t::setup_ui() {
 
     setup_menus();
     setup_toolbar();
-    setup_function_list();
     setup_main_views();
-    setup_output();
 }
 
 void user_interface_t::setup_menus() {
@@ -223,26 +219,6 @@ void user_interface_t::setup_toolbar() {
     add_tool(QStyle::SP_ArrowForward, "Forward");
 }
 
-void user_interface_t::setup_function_list() {
-    functions_dock = new QDockWidget("Functions", this);
-    functions_dock->setObjectName("functions_dock");
-    functions_dock->setAllowedAreas(
-        Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea
-    );
-
-    function_list = new QTreeWidget(functions_dock);
-    function_list->setColumnCount(1);
-    function_list->setHeaderLabels({"Name"});
-    function_list->setAlternatingRowColors(true);
-    function_list->setSortingEnabled(true);
-
-    functions_dock->setWidget(function_list);
-    functions_dock->hide();
-
-    addDockWidget(Qt::LeftDockWidgetArea, functions_dock);
-    resizeDocks({functions_dock}, {width() / 5}, Qt::Horizontal);
-}
-
 void user_interface_t::setup_main_views() {
     main_views = new QTabWidget(this);
     main_views->setObjectName("main_tabs");
@@ -259,33 +235,10 @@ void user_interface_t::setup_main_views() {
     main_views->tabBar()->hide();
 
     setCentralWidget(main_views);
-}
 
-void user_interface_t::setup_output() {
-    auto* dock = new QDockWidget("Output", this);
-    dock->setObjectName("output_dock");
-    dock->setAllowedAreas(Qt::BottomDockWidgetArea);
+    show_output_view();
 
-    auto* container = new QWidget(dock);
-    auto* layout = new QVBoxLayout(container);
-
-    output = new QPlainTextEdit(container);
-    output->setObjectName("output_view");
-    output->setReadOnly(true);
-    output->setFont(QFontDatabase::systemFont(QFontDatabase::FixedFont));
-    output->setMaximumBlockCount(5000);
-
-    input = new QLineEdit(container);
-    input->setObjectName("input_box");
-    connect(input, &QLineEdit::returnPressed, this, &user_interface_t::execute_command);
-    
-    layout->addWidget(output);
-    layout->addWidget(input);
-
-    dock->setWidget(container);
-    addDockWidget(Qt::BottomDockWidgetArea, dock);
-
-    resizeDocks({dock}, {height() / 3}, Qt::Vertical);
+    connect(output_view_, &output_view_t::command_entered, this, &user_interface_t::execute_command);
 }
 
 void user_interface_t::close_tab(int index) {
@@ -300,18 +253,22 @@ void user_interface_t::close_tab(int index) {
 
     if (widget == disassembly_view_)
         disassembly_view_ = nullptr;
+
     else if (widget == strings_view_)
         strings_view_ = nullptr;
+
+    else if (widget == output_view_)
+        output_view_ = nullptr;
 
     if (main_views->count() == 0)
         main_views->tabBar()->hide();
 }
 
 void user_interface_t::log(const QString& message) {
-    if (!output)
+    if (!output_view_)
         return;
 
-    output->appendPlainText(message);
+    output_view_->append(message);
 }
 
 void user_interface_t::apply_theme() {

@@ -5,7 +5,6 @@
 #include <cstdint>
 
 enum class load_command_type_t : uint32_t {
-    // core segment and symbol commands
     segment                   = 0x00000001, // LC_SEGMENT
     sym_tab                   = 0x00000002, // LC_SYMTAB
     sym_seg                   = 0x00000003, // LC_SYMSEG
@@ -143,6 +142,7 @@ private:
     void parse_segment_64();
     void parse_section_64(segment_command_64_t& segment);
     void parse_cstrings(segment_section_64_t& section);
+    void parse_text(segment_section_64_t& section);
 
     void parse_symtab();
 };

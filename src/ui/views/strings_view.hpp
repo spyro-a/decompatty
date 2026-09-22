@@ -9,8 +9,7 @@
 
 class string_item_t : public QTreeWidgetItem {
 public:
-    explicit string_item_t(QTreeWidget* parent)
-        : QTreeWidgetItem(parent) {}
+    explicit string_item_t(QTreeWidget* parent) : QTreeWidgetItem(parent) {}
 
     bool operator<(const QTreeWidgetItem& other) const override {
         const int column = treeWidget()->sortColumn();
