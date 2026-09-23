@@ -21,7 +21,7 @@ hex_view_t::hex_view_t(std::uint64_t image_base, std::span<const std::byte> data
     for (std::size_t i = 0; i < byte_count; i += line_width) {
         const std::size_t remaining = std::min<std::size_t>(line_width, byte_count - i);
 
-        QString line = "0x" + utils::hex(static_cast<std::byte>(image_base + i));
+        QString line = "0x" + utils::hex(image_base + i, 16);
 
         for (std::size_t j = 0; j < line_width; j++) {
             if (j == line_width / 2)

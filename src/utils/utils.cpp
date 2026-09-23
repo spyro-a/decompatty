@@ -29,12 +29,3 @@ std::optional<std::vector<std::byte>> utils::load_file(const char* path) {
 
     return data;
 }
-
-QString utils::hex(std::byte value, int width) {
-    return QStringLiteral("%1").arg(
-        std::to_integer<unsigned int>(value),
-        width,
-        16,
-        QChar('0')
-    ).toUpper();
-}
