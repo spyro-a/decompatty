@@ -109,8 +109,6 @@ struct symbol_table_command_t {
 class macho_file_t : public binary_file_t {
 public:
     explicit macho_file_t(std::vector<std::byte> data, log_sink_t logger = {});
-    
-    void analyze() override;
 
     const std::vector<segment_command_64_t>& segments() const {
         return segments_;
@@ -129,6 +127,11 @@ public:
     }
 
 private:
+    std::uint32_t load_command_count = 0;
+    std::uint32_t load_command_size = 0;
+    std::size_t load_commands_begin = 0;
+    std::size_t load_commands_end = 0;
+
     std::vector<segment_command_64_t> segments_;
     std::vector<segment_section_64_t> sections_;
 
@@ -136,7 +139,8 @@ private:
     std::vector<string_t> strings_;
 
     void parse_header() override;
-    void parse_macho(std::uint32_t magic);
+    void parse_macho();
+    void parse_macho_fat(std::uint32_t magic);
 
     // LOAD command parsers
     void parse_segment_64();

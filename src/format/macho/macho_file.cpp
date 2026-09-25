@@ -11,73 +11,64 @@ macho_file_t::macho_file_t(std::vector<std::byte> data, log_sink_t logger)
     : binary_file_t(std::move(data), std::move(logger)) {
     try {
         parse_header();
+        parse_macho();
+        log("Image base: 0x%llx\nImage end: 0x%llx", image_base(), image_end());
     } catch (const std::exception& error) {
-        log("mach-o parse aborted: %s", error.what());
+        log("Mach-o parse aborted: %s", error.what());
     }
-}
-
-void macho_file_t::analyze() {
-    
 }
 
 void macho_file_t::parse_header() {
     format_ = binary_format_t::macho;
     log("Mach-O binary detected");
-    parse_macho(reader_.magic());
-}
+    if (std::uint32_t magic = reader_.magic()) {
+        switch (magic) {
+            case FORMAT_MACHO_64_BE:
+                bitness_ = bitness_t::bits_64;
+                endianness_ = endianness_t::big;
+                break;
 
-void macho_file_t::parse_macho(std::uint32_t magic) {
-    switch (magic) {
-        case FORMAT_MACHO_32_BE:
-            bitness_ = bitness_t::bits_32;
-            endianness_ = endianness_t::big;
-            break;
+            case FORMAT_MACHO_64_LE:
+                bitness_ = bitness_t::bits_64;
+                endianness_ = endianness_t::little;
+                parse_macho();
+                break;
 
-        case FORMAT_MACHO_32_LE:
-            bitness_ = bitness_t::bits_32;
-            endianness_ = endianness_t::little;
-            break;
+            case FORMAT_MACHO_32_BE:
+                bitness_ = bitness_t::bits_32;
+                endianness_ = endianness_t::big;
+                break;
 
-        case FORMAT_MACHO_64_BE:
-            bitness_ = bitness_t::bits_64;
-            endianness_ = endianness_t::big;
-            break;
+            case FORMAT_MACHO_32_LE:
+                bitness_ = bitness_t::bits_32;
+                endianness_ = endianness_t::little;
+                break;
 
-        case FORMAT_MACHO_64_LE:
-            bitness_ = bitness_t::bits_64;
-            endianness_ = endianness_t::little;
-            break;
+            default:
+                log("Mach-O magic unknown: 0x%08X", magic);
+                return;
+        }
 
-        default:
-            log("Mach-O magic unknown: 0x%08X", magic);
-            return;
+        reader_.seek(sizeof(magic));
+        reader_.set_endianness(endianness_);
     }
 
-    reader_.set_endianness(endianness_);
-    reader_.seek(sizeof(std::uint32_t));
-
-    auto cpu = reader_.u32();
-
-    if (cpu & 0x01000000)
-        cpu &= ~0x01000000;
-
-    if (cpu & 0x02000000)
-        cpu &= ~0x02000000;
-
-    architecture_ = static_cast<cpu_type_t>(cpu);
-
+    // whatever is skipped is not something that is necessary in the current scope of the project
+    architecture_ = static_cast<cpu_type_t>(reader_.u32() & ~(0x01000000 | 0x02000000));
     reader_.skip(sizeof(std::uint32_t)); // cpu subtype
     reader_.skip(sizeof(std::uint32_t)); // file type
-    std::uint32_t load_command_count = reader_.u32();
-    std::uint32_t load_command_size = reader_.u32();
+    load_command_count = reader_.u32();
+    load_command_size = reader_.u32();
     reader_.skip(sizeof(std::uint32_t)); // flags
 
     if (bitness_ == bitness_t::bits_64)
         reader_.skip(sizeof(std::uint32_t)); // reserved for 64-bit binaries
 
-    const std::size_t load_commands_begin = reader_.tell();
-    const std::size_t load_commands_end = load_commands_begin + load_command_size;
+    load_commands_begin = reader_.tell();
+    load_commands_end = load_commands_begin + load_command_size;
+}
 
+void macho_file_t::parse_macho() {
     for (std::uint32_t i = 0; i < load_command_count; i++) {
         const auto start = reader_.tell();
 
@@ -115,9 +106,9 @@ void macho_file_t::parse_macho(std::uint32_t magic) {
 
         reader_.seek(start + cmd.size);
     }
-
-    log("image base: 0x%llx\nimage end: 0x%llx", image_base(), image_end());
 }
+
+void parse_macho_fat(std::uint32_t magic);
 
 void macho_file_t::parse_segment_64() {
     segment_command_64_t segment;
@@ -163,11 +154,13 @@ void macho_file_t::parse_section_64(segment_command_64_t& segment) {
     if (section.file_offset != 0 && section.size != 0)
         section.data = reader_.read_at(section.file_offset, section.size);
 
-    if (section.section_name == "__cstring")
+    if (section.section_name == "__cstring") {
         parse_cstrings(section);
+    }
 
-    if (section.section_name == "__text")
+    if (section.section_name == "__text") {
         parse_text(section);
+    }
 
     log("  %s: 0x%llx", section.section_name.c_str(), section.address);
     
@@ -197,7 +190,6 @@ void macho_file_t::parse_cstrings(segment_section_64_t& section) {
 }
 
 void macho_file_t::parse_text(segment_section_64_t& section) {
-    log("parsing text");
     switch (architecture_) {
         case cpu_type_t::arm64:
             break;

@@ -31,8 +31,8 @@ std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger) 
         case FORMAT_MACHO_32_LE:
         case FORMAT_MACHO_64_BE:
         case FORMAT_MACHO_64_LE:
-        case FORMAT_MACHO_FAT_BE:
-        case FORMAT_MACHO_FAT_LE:
+        // case FORMAT_MACHO_FAT_BE:
+        // case FORMAT_MACHO_FAT_LE:
             return std::make_unique<macho_file_t>(std::move(*data), std::move(logger));
 
         default:

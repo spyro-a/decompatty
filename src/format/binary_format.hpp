@@ -56,5 +56,7 @@ constexpr std::uint32_t FORMAT_MACHO_64_BE = 0xFEEDFACF;
 constexpr std::uint32_t FORMAT_MACHO_64_LE = 0xCFFAEDFE;
 
 // mach-o universal / fat
-constexpr std::uint32_t FORMAT_MACHO_FAT_BE = 0xCAFEBABE;
-constexpr std::uint32_t FORMAT_MACHO_FAT_LE = 0xBEBAFECA;
+constexpr std::uint32_t FORMAT_MACHO_FAT_32_BE = 0xCAFEBABE;
+constexpr std::uint32_t FORMAT_MACHO_FAT_32_LE = 0xBEBAFECA;
+constexpr std::uint32_t FORMAT_MACHO_FAT_64_BE = 0xCAFEBABF;
+constexpr std::uint32_t FORMAT_MACHO_FAT_64_LE = 0xBFBAFECA;

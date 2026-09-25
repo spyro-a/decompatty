@@ -64,8 +64,8 @@ void user_interface_t::open_file() {
 
     main_views->tabBar()->show();
     
-    show_functions_view();
-    show_hex_view();
+    // show_functions_view();
+    // show_hex_view();
 
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
     statusBar()->showMessage("Opened: " + path);

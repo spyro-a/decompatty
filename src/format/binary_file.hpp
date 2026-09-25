@@ -55,7 +55,6 @@ protected:
     explicit binary_file_t(std::vector<std::byte> data, log_sink_t logger = {});
 
     virtual void parse_header() = 0;
-    virtual void analyze() = 0;
 
     void log(const char* format, ...) const
         __attribute__((format(printf, 2, 3))) {
