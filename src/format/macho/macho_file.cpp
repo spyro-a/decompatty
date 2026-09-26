@@ -7,8 +7,8 @@
 #include <string>
 #include <utility>
 
-macho_file_t::macho_file_t(std::vector<std::byte> data, log_sink_t logger)
-    : binary_file_t(std::move(data), std::move(logger)) {
+macho_file_t::macho_file_t(std::vector<std::byte> data, log_sink_t logger, arch_resolver_t resolver, void* resolver_ctx)
+    : binary_file_t(std::move(data), std::move(logger), resolver, resolver_ctx) {
     try {
         parse_header();
         parse_macho();
@@ -31,7 +31,6 @@ void macho_file_t::parse_header() {
             case FORMAT_MACHO_64_LE:
                 bitness_ = bitness_t::bits_64;
                 endianness_ = endianness_t::little;
-                parse_macho();
                 break;
 
             case FORMAT_MACHO_32_BE:
@@ -81,7 +80,7 @@ void macho_file_t::parse_macho() {
         cmd.type = static_cast<load_command_type_t>(reader_.u32());
         cmd.size = reader_.u32();
 
-        const bool necessary_to_run = static_cast<std::uint32_t>(cmd.type) & req_dyld_mask;
+        // const bool necessary_to_run = static_cast<std::uint32_t>(cmd.type) & req_dyld_mask;
 
         if (cmd.size < sizeof(macho_load_command_t) || start + cmd.size > load_commands_end) {
             log("invalid load command size 0x%08X at offset 0x%zx", cmd.size, start);
@@ -122,21 +121,20 @@ void macho_file_t::parse_segment_64() {
     segment.section_count = reader_.u32();
     segment.flags = reader_.u32();
 
-    log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
-    
-    segments_.push_back(std::move(segment));
-
     if (segment.file_size != 0 && segment.address_size != 0) {
         image_base_ = std::min(image_base_, segment.address);
         image_end_ = std::max(image_end_, segment.address + segment.address_size);
     }
 
-    for (std::uint32_t i = 0; i < segment.section_count; ++i) {
-        parse_section_64(segment);
-    }
+    log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
+    
+    for (std::uint32_t i = 0; i < segment.section_count; ++i)
+        parse_section_64();
+
+    segments_.push_back(std::move(segment));
 }
 
-void macho_file_t::parse_section_64(segment_command_64_t& segment) {
+void macho_file_t::parse_section_64() {
     segment_section_64_t section;
     section.section_name = reader_.string(16);
     section.segment_name = reader_.string(16);
@@ -154,13 +152,11 @@ void macho_file_t::parse_section_64(segment_command_64_t& segment) {
     if (section.file_offset != 0 && section.size != 0)
         section.data = reader_.read_at(section.file_offset, section.size);
 
-    if (section.section_name == "__cstring") {
+    if (section.section_name == "__cstring")
         parse_cstrings(section);
-    }
 
-    if (section.section_name == "__text") {
+    if (section.section_name == "__text")
         parse_text(section);
-    }
 
     log("  %s: 0x%llx", section.section_name.c_str(), section.address);
     
@@ -190,14 +186,44 @@ void macho_file_t::parse_cstrings(segment_section_64_t& section) {
 }
 
 void macho_file_t::parse_text(segment_section_64_t& section) {
-    switch (architecture_) {
-        case cpu_type_t::arm64:
-            break;
-        case cpu_type_t::x86_64:
-            break;
-        default:
-            break;
+    if (section.data.empty())
+        return;
+
+    if (!ensure_arch()) {
+        log("no architecture plugin for cpu 0x%02X", static_cast<unsigned>(architecture_));
+        return;
     }
+
+    decompatty_section input{};
+    input.data = reinterpret_cast<const std::uint8_t*>(section.data.data());
+    input.length = section.data.size();
+    input.address = section.address;
+    input.file_offset = section.file_offset;
+    input.section_name = section.section_name.c_str();
+
+    if (arch_->disassemble(input) != DECOMPATTY_OK)
+        return;
+
+    const std::size_t count = arch_->count();
+    instructions_.reserve(instructions_.size() + count);
+
+    for (std::size_t i = 0; i < count; ++i) {
+        const decompatty_instruction* raw = arch_->at(i);
+
+        if (!raw)
+            continue;
+
+        instruction_t instruction;
+        instruction.address = raw->address;
+        instruction.mnemonic = arch_->string(raw->mnemonic_offset);
+        instruction.operands = arch_->string(raw->operands_offset);
+        instruction.file_offset = section.file_offset + raw->section_offset;
+        instruction.length = raw->length;
+        instruction.flags = raw->flags;
+        instructions_.push_back(std::move(instruction));
+    }
+
+    log("%s: %zu instructions decoded", section.section_name.c_str(), instructions_.size());
 }
 
 void macho_file_t::parse_symtab() {

@@ -8,12 +8,14 @@
 
 #include <utility>
 
-binary_file_t::binary_file_t(std::vector<std::byte> data, log_sink_t logger)
+binary_file_t::binary_file_t(std::vector<std::byte> data, log_sink_t logger, arch_resolver_t resolver, void* resolver_ctx)
     : data_(std::move(data)),
       reader_(data_),
+      resolver_(resolver),
+      resolver_ctx_(resolver_ctx),
       logger_(std::move(logger)) {}
 
-std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger) {
+std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger, arch_resolver_t resolver, void* resolver_ctx) {
     auto data = utils::load_file(path);
 
     if (!data || data->size() < sizeof(std::uint32_t)) // magic is usually 4 bytes
@@ -33,7 +35,8 @@ std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger) 
         case FORMAT_MACHO_64_LE:
         // case FORMAT_MACHO_FAT_BE:
         // case FORMAT_MACHO_FAT_LE:
-            return std::make_unique<macho_file_t>(std::move(*data), std::move(logger));
+            return std::make_unique<macho_file_t>(std::move(*data), std::move(logger),
+                                                  resolver, resolver_ctx);
 
         default:
             break;

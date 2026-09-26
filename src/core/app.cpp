@@ -1,5 +1,7 @@
 #include <core/app.hpp>
 
+#include <QCoreApplication>
+
 #include <ui/user_interface.hpp>
 
 app_t::app_t(int& argc, char* argv[])
@@ -17,5 +19,9 @@ int app_t::run() {
 bool app_t::setup(const char* app_name, int width, int height) {
     ui->set_engine(&analysis);
 
-    return ui->setup(app_name, width, height);
+    if (!ui->setup(app_name, width, height))
+        return false;
+
+    analysis.discover_archs(QCoreApplication::applicationDirPath().toStdString() + "/arch");
+    return true;
 }
