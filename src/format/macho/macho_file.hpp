@@ -63,7 +63,7 @@ enum class load_command_type_t : uint32_t {
     fileset_entry             = 0x80000035  // LC_FILESET_ENTRY
 };
 
-inline constexpr uint32_t req_dyld_mask = 0x80000000; // necessary to run binary or not
+inline constexpr uint32_t req_dyld_mask = 0x80000000; // necessary for dyld to run the app
 
 struct macho_load_command_t {
     load_command_type_t type;
@@ -106,6 +106,16 @@ struct symbol_table_command_t {
     std::uint32_t strings_size;
 };
 
+struct entry_point_command_t {
+    std::uint64_t entry_offset;
+    std::uint64_t stack_size;
+};
+
+struct function_starts_command_t { // name should be changed in future
+    std::uint32_t data_offset;
+    std::uint32_t data_size;
+};
+
 class macho_file_t : public binary_file_t {
 public:
     explicit macho_file_t(
@@ -139,6 +149,7 @@ private:
     std::uint32_t load_command_size = 0;
     std::size_t load_commands_begin = 0;
     std::size_t load_commands_end = 0;
+    std::uint64_t entry_point_offset = 0;
 
     std::vector<segment_command_64_t> segments_;
     std::vector<segment_section_64_t> sections_;
@@ -152,6 +163,8 @@ private:
     void parse_macho_fat(std::uint32_t magic);
 
     // LOAD command parsers
+    void parse_main();
+    void parse_function_start_addresses();
     void parse_segment_64();
     void parse_section_64();
     void parse_cstrings(segment_section_64_t& section);

@@ -13,18 +13,16 @@
 
 #include <string>
 
-namespace {
-    std::string read_theme(const char* path) {
-        const auto data = utils::load_file(path);
+std::string read_theme(const char* path) {
+    const auto data = utils::load_file(path);
 
-        if (!data)
-            return {};
+    if (!data)
+        return {};
 
-        return std::string(
-            reinterpret_cast<const char*>(data->data()),
-            data->size()
-        );
-    }
+    return std::string(
+        reinterpret_cast<const char*>(data->data()),
+        data->size()
+    );
 }
 
 user_interface_t::user_interface_t(QWidget* parent) : QMainWindow(parent) {}
@@ -50,8 +48,17 @@ void user_interface_t::open_file() {
     if (path.isEmpty())
         return;
 
+    open_path(path);
+}
+
+bool user_interface_t::open_path(const QString& path) {
     if (!engine_)
-        return;
+        return false;
+
+    if (!QFile::exists(path)) {
+        statusBar()->showMessage("no such file: " + path);
+        return false;
+    }
 
     engine_->set_logger([this](const std::string& message) {
         log(QString::fromStdString(message));
@@ -59,27 +66,37 @@ void user_interface_t::open_file() {
 
     if (!engine_->load(path.toLocal8Bit().constData())) {
         statusBar()->showMessage("failed to open: " + path);
-        return;
+        return false;
     }
 
     main_views->tabBar()->show();
-    
+
     // show_functions_view();
     // show_hex_view();
 
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
     statusBar()->showMessage("Opened: " + path);
+    return true;
 }
 
 disassembly_view_t* user_interface_t::show_disassembly_view() {
     if (disassembly_view_)
         return disassembly_view_;
 
-    disassembly_view_ = new disassembly_view_t(this);
+    if (!engine_ || !engine_->has_binary())
+        return nullptr;
+
+    const auto* binary = engine_->binary();
+
+    if (binary->instructions().empty())
+        log("no instructions to disassemble, is an architecture plugin loaded?");
+
+    disassembly_view_ = new disassembly_view_t(binary->instructions(), binary->data(), this);
     disassembly_view_->setObjectName("disassembly_view");
 
     main_views->addTab(disassembly_view_, "Disassembly");
     main_views->setCurrentWidget(disassembly_view_);
+    main_views->tabBar()->show();
 
     views_["disassembly_view"] = disassembly_view_;
 
@@ -201,7 +218,8 @@ void user_interface_t::setup_menus() {
     QAction* open_disassembly_action = new QAction("&Disassembly View");
     open_view_menu->addAction(open_disassembly_action);
     connect(open_disassembly_action, &QAction::triggered, this, [this] {
-        // TODO: implement
+        if (!show_disassembly_view())
+            log("open a file before opening the disassembly view");
     });
 
     QAction* open_strings_action = new QAction("&Strings View");

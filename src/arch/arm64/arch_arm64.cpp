@@ -1,31 +1,34 @@
 #include <abi/decompatty_arch.h>
 
+#include <arm64_decode.hpp>
+
 #include <cstddef>
-#include <cstring>
+#include <cstdint>
 #include <new>
+#include <string>
+#include <vector>
+#include <unordered_map>
 
 struct arm64_context_t {
-    char pool[4096];
-    std::size_t pool_used = 0;
-    const decompatty_instruction* instructions = nullptr;
-    std::size_t count = 0;
-    const char* name = "arm64";
+    std::vector<decompatty_instruction> instructions;
+    std::vector<std::string> strings;   // mnemonic / operands
+    std::unordered_map<std::string, std::uint32_t> string_index;
+    std::uint64_t base = 0;
+
+    std::uint32_t intern(const std::string& text) {
+        if (const auto it = string_index.find(text); it != string_index.end())
+            return it->second;
+
+        const auto index = static_cast<std::uint32_t>(strings.size());
+        strings.push_back(text);
+        string_index.emplace(strings.back(), index);
+        return index;
+    }
 };
 
 void log_to_host(const decompatty_host* host, const char* msg) {
     if (host && host->log)
         host->log(host->log_context, msg);
-}
-
-const char* intern(arm64_context_t* ctx, const char* text) {
-    const std::size_t len = std::strlen(text) + 1;
-    if (ctx->pool_used + len > sizeof(ctx->pool))
-        return "";
-
-    char* slot = ctx->pool + ctx->pool_used;
-    std::memcpy(slot, text, len);
-    ctx->pool_used += len;
-    return slot;
 }
 
 decompatty_status create(const decompatty_host* host, void** out_context) {
@@ -45,21 +48,47 @@ void destroy(void* context) {
     delete static_cast<arm64_context_t*>(context);
 }
 
-decompatty_status disassemble(void* context, const decompatty_section* section, const decompatty_host* host) {
-    if (!context || !section || !section->data)
+decompatty_status disassemble(void* context, const decompatty_section* section, const decompatty_host* host) noexcept {
+    if (!context || !section || !section->data || section->length == 0)
         return DECOMPATTY_ERR_INVAL;
 
-    log_to_host(host, "arm64: no decoder linked, cannot decode __text");
-    return DECOMPATTY_ERR_UNSUPPORTED;
+    auto* ctx = static_cast<arm64_context_t*>(context);
+    ctx->instructions.clear();
+    ctx->base = section->address;
+
+    for (std::uint64_t offset = 0; offset + 4 <= section->length; offset += 4) {
+        const auto* p = section->data + offset;
+
+        std::uint32_t bits = 0;
+        for (int i = 0; i < 4; ++i)
+            bits |= static_cast<std::uint32_t>(p[i]) << (i * 8);
+
+        arm64_instruction_t instruction;
+        if (!arm64_decode(bits, section->address + offset, instruction))
+            break;
+
+        decompatty_instruction out{};
+        out.address = section->address + offset;
+        out.section_offset = static_cast<std::uint32_t>(offset);
+        out.mnemonic_offset = ctx->intern(instruction.mnemonic);
+        out.operands_offset = ctx->intern(instruction.operands);
+        out.length = instruction.length;
+        out.flags = instruction.branch ? DECOMPATTY_INSTR_BRANCH : 0;
+
+        ctx->instructions.push_back(out);
+    }
+
+    log_to_host(host, "arm64: decoded __text");
+    return DECOMPATTY_OK;
 }
 
 std::size_t instruction_count(const void* context) {
-    return context ? static_cast<const arm64_context_t*>(context)->count : 0;
+    return context ? static_cast<const arm64_context_t*>(context)->instructions.size() : 0;
 }
 
 const decompatty_instruction* instruction_at(const void* context, std::size_t index) {
     const auto* ctx = static_cast<const arm64_context_t*>(context);
-    if (!ctx || !ctx->instructions || index >= ctx->count)
+    if (!ctx || index >= ctx->instructions.size())
         return nullptr;
 
     return &ctx->instructions[index];
@@ -67,10 +96,10 @@ const decompatty_instruction* instruction_at(const void* context, std::size_t in
 
 const char* string_at(const void* context, std::uint32_t offset) {
     const auto* ctx = static_cast<const arm64_context_t*>(context);
-    if (!ctx || offset >= ctx->pool_used)
+    if (!ctx || offset >= ctx->strings.size())
         return "";
 
-    return ctx->pool + offset;
+    return ctx->strings[offset].c_str();
 }
 
 const decompatty_arch_api API = {

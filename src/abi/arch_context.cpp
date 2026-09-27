@@ -22,6 +22,7 @@ arch_context_t::~arch_context_t() {
 decompatty_status arch_context_t::disassemble(const decompatty_section& section) {
     if (!context_)
         return DECOMPATTY_ERR_INVAL;
+    
     return api_->disassemble(context_, &section, &host_);
 }
 

@@ -6,6 +6,7 @@
 #include <cstdarg>
 #include <cstddef>
 #include <cstdio>
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <span>
@@ -61,6 +62,14 @@ public:
 
     std::span<const std::byte> data() const noexcept { return data_; }
     std::size_t size() const noexcept { return data_.size(); }
+
+    std::uint64_t entry_point() const noexcept {
+        return entry_point_;
+    }
+
+    std::uint64_t stack_size() const noexcept {
+        return stack_size_;
+    }
 
     std::uint64_t image_base() const noexcept {
         return image_base_;
@@ -118,6 +127,9 @@ protected:
 
     std::vector<std::byte> data_;
     binary_reader_t reader_;
+
+    std::uint64_t entry_point_ = 0;
+    std::uint64_t stack_size_ = 0;
 
     std::uint64_t image_base_ = UINT64_MAX;
     std::uint64_t image_end_ = 0;

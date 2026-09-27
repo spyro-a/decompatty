@@ -89,6 +89,16 @@ void macho_file_t::parse_macho() {
 
         // handle each command here
         switch (cmd.type) {
+            // TODO: use this as the official entry point; computing it should be a fallback
+            // case load_command_type_t::main:
+            //     parse_main();
+            //     break;
+
+            // ULEB128 delta-encoded
+            case load_command_type_t::function_starts:
+                parse_function_start_addresses();
+                break;
+
             // provides segments + sections
             case load_command_type_t::segment_64:
                 parse_segment_64();
@@ -109,6 +119,18 @@ void macho_file_t::parse_macho() {
 
 void parse_macho_fat(std::uint32_t magic);
 
+void macho_file_t::parse_main() {
+    entry_point_command_t entry;
+    entry.entry_offset = reader_.u64();
+    entry.stack_size = reader_.u64();
+}
+
+void macho_file_t::parse_function_start_addresses() {
+    function_starts_command_t function_starts;
+    function_starts.data_offset = reader_.u32();
+    function_starts.data_size = reader_.u32();
+}
+
 void macho_file_t::parse_segment_64() {
     segment_command_64_t segment;
     segment.segment_name = reader_.string(16);
@@ -126,7 +148,7 @@ void macho_file_t::parse_segment_64() {
         image_end_ = std::max(image_end_, segment.address + segment.address_size);
     }
 
-    log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
+    // log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
     
     for (std::uint32_t i = 0; i < segment.section_count; ++i)
         parse_section_64();
@@ -158,7 +180,7 @@ void macho_file_t::parse_section_64() {
     if (section.section_name == "__text")
         parse_text(section);
 
-    log("  %s: 0x%llx", section.section_name.c_str(), section.address);
+    // log("  %s: 0x%llx", section.section_name.c_str(), section.address);
     
     sections_.push_back(std::move(section));
 }

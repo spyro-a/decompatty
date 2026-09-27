@@ -20,6 +20,7 @@ public:
     std::unordered_map<QString, QWidget*>& views();
 
     void open_file();
+    bool open_path(const QString& path);
     void execute_command(const QString& command);
     void close_tab(int index);
 
