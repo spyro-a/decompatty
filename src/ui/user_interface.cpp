@@ -73,6 +73,7 @@ bool user_interface_t::open_path(const QString& path) {
 
     // show_functions_view();
     // show_hex_view();
+    show_disassembly_view();
 
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
     statusBar()->showMessage("Opened: " + path);

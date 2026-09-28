@@ -8,7 +8,8 @@ enum class operation_identifier_t {
     ret,
     br,
     b,
-    bl
+    bl,
+    ldr_imm
 };
 
 struct entry_t {
@@ -24,12 +25,14 @@ constexpr std::array table = {
     entry_t{0xFFFFFC1Fu, 0xD61F0000u, operation_identifier_t::br, "br"},
     entry_t{0xFC000000u, 0x14000000u, operation_identifier_t::b, "b"},
     entry_t{0xFC000000u, 0x94000000u, operation_identifier_t::bl, "bl"},
+    entry_t{0xFFC00000u, 0xF9400000u, operation_identifier_t::ldr_imm, "ldr"},
+    entry_t{0xFFC00000u, 0xB9400000u, operation_identifier_t::ldr_imm, "ldr"},   // opc=10 -> w, x4
+    entry_t{0xFFC00000u, 0x3DC00000u, operation_identifier_t::ldr_imm, "ldr"},   // opc=00,V=1 -> q, x16
 };
 
-// constexpr std::uint32_t register_number_field_mask = 0b00000000'00000000'00000011'11100000;
-// constexpr std::uint32_t field_imm26 = 0b00000011'11111111'11111111'11111111;
-
-constexpr std::uint32_t register_number_field_mask = 0x000003E0u;
+constexpr std::uint32_t field_rd = 0x0000001Fu; // register destination
+constexpr std::uint32_t field_rn = 0x000003E0u; // register number
+constexpr std::uint32_t field_imm12 = 0x003FFC00u;
 constexpr std::uint32_t field_imm26 = 0x03FFFFFFu;
 
 std::int64_t sign_extend(std::uint32_t value, std::uint32_t bits) {
@@ -41,6 +44,12 @@ std::string reg64(std::uint32_t n) {
     if (n == 31)
         return "xzr";
 
+    return "x" + std::to_string(n);
+}
+
+std::string reg_sp(std::uint32_t n) {
+    if (n == 31)
+        return "sp";
     return "x" + std::to_string(n);
 }
 
@@ -73,7 +82,7 @@ bool arm64_decode(std::uint32_t bits, std::uint64_t address, arm64_instruction_t
         case operation_identifier_t::ret:
         case operation_identifier_t::br:
             out.branch = true;
-            out.operands = reg64((bits & register_number_field_mask) >> 5);
+            out.operands = reg64((bits & field_rn) >> 5);
             break;
 
         case operation_identifier_t::b:
@@ -81,6 +90,24 @@ bool arm64_decode(std::uint32_t bits, std::uint64_t address, arm64_instruction_t
             out.branch = true;
             const auto delta = sign_extend(bits & field_imm26, 26) * 4;
             std::snprintf(buf, sizeof(buf), "0x%llx", static_cast<unsigned long long>(address + delta));
+            out.operands = buf;
+            break;
+        }
+
+        case operation_identifier_t::ldr_imm: {
+            const auto opc = (bits >> 30) & 0x3;
+            const auto vec = (bits >> 26) & 0x1;
+            const char* pre = (vec ? "q" : (opc == 2 ? "w" : "x"));
+            const auto scale = (vec ? 16ull : (opc == 2 ? 4ull : 8ull));
+            const auto imm12 = (bits & field_imm12) >> 10;
+            const auto rn = (bits & field_rn) >> 5;
+            const auto rt = bits & field_rd;
+            const auto base = reg_sp(rn);   // sp, or x<rn>
+            if (imm12)
+                std::snprintf(buf, sizeof(buf), "%s%u, [%s, #0x%llx]", pre, rt, base.c_str(),
+                              static_cast<unsigned long long>(imm12 * scale));
+            else
+                std::snprintf(buf, sizeof(buf), "%s%u, [%s]", pre, rt, base.c_str());
             out.operands = buf;
             break;
         }
