@@ -9,6 +9,7 @@ struct arm64_instruction_t {
     std::string mnemonic;
     std::string operands;
     bool branch = false;
+    bool decoded = false;
 };
 
 bool arm64_decode(std::uint32_t bits, std::uint64_t address, arm64_instruction_t& out);

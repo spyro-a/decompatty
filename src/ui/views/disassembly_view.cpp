@@ -99,6 +99,7 @@ disassembly_view_t::disassembly_view_t(const std::vector<instruction_t>& instruc
     tree->resizeColumnToContents(0);
     tree->resizeColumnToContents(1);
 
+    tree->sortItems(0, Qt::AscendingOrder);
     tree->setSortingEnabled(true);
 
     layout->addWidget(tree);

@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <new>
 #include <string>
 #include <vector>
@@ -56,6 +57,8 @@ decompatty_status disassemble(void* context, const decompatty_section* section, 
     ctx->instructions.clear();
     ctx->base = section->address;
 
+    std::size_t decoded = 0;
+
     for (std::uint64_t offset = 0; offset + 4 <= section->length; offset += 4) {
         const auto* p = section->data + offset;
 
@@ -66,6 +69,8 @@ decompatty_status disassemble(void* context, const decompatty_section* section, 
         arm64_instruction_t instruction;
         if (!arm64_decode(bits, section->address + offset, instruction))
             break;
+        if (instruction.decoded)
+            ++decoded;
 
         decompatty_instruction out{};
         out.address = section->address + offset;
@@ -78,7 +83,11 @@ decompatty_status disassemble(void* context, const decompatty_section* section, 
         ctx->instructions.push_back(out);
     }
 
-    log_to_host(host, "arm64: decoded __text");
+    char summary[96];
+    const auto total = ctx->instructions.size();
+    std::snprintf(summary, sizeof(summary), "arm64: decoded __text %zu/%zu (%.1f%%)", decoded, total,
+                  total ? 100.0 * static_cast<double>(decoded) / static_cast<double>(total) : 0.0);
+    log_to_host(host, summary);
     return DECOMPATTY_OK;
 }
 

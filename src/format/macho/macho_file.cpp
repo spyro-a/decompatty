@@ -87,7 +87,7 @@ void macho_file_t::parse_macho() {
             return;
         }
 
-        // handle each command here
+        // handle load commands here
         switch (cmd.type) {
             // TODO: use this as the official entry point; computing it should be a fallback
             // case load_command_type_t::main:
@@ -148,7 +148,7 @@ void macho_file_t::parse_segment_64() {
         image_end_ = std::max(image_end_, segment.address + segment.address_size);
     }
 
-    // log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
+    log("%s: %u sections:", segment.segment_name.c_str(), segment.section_count);
     
     for (std::uint32_t i = 0; i < segment.section_count; ++i)
         parse_section_64();
@@ -180,7 +180,7 @@ void macho_file_t::parse_section_64() {
     if (section.section_name == "__text")
         parse_text(section);
 
-    // log("  %s: 0x%llx", section.section_name.c_str(), section.address);
+    log("  %s: 0x%llx", section.section_name.c_str(), section.address);
     
     sections_.push_back(std::move(section));
 }
@@ -196,7 +196,6 @@ void macho_file_t::parse_cstrings(segment_section_64_t& section) {
             string_t string;
 
             string.value = std::string(reinterpret_cast<const char*>(section.data.data() + start), i - start);
-
             string.address = section.address + start;
             string.file_offset = section.file_offset + start;
 
