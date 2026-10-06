@@ -26,10 +26,10 @@ cmake --build build
 ## Usage
 
 ```sh
-./build/decompatty
+./build/decompatty [file]
 ```
 
-Inside the app, use **File > Open** (or Ctrl+O / Cmd+O) to load a binary.
+Inside decompatty, use **File > Open** (or Ctrl+O / Cmd+O) to load a binary.
 Open views from **View > Open View**
 
 ## Screenshots
