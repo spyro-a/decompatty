@@ -34,5 +34,8 @@ Open views from **View > Open View**
 
 ## Screenshots
 
+### Disassembly view
+![Disassembly View](docs/screenshots/disassembly.png)
+
 ### Strings view
 ![Strings view](docs/screenshots/strings.png)
