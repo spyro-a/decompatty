@@ -84,6 +84,7 @@ QTabBar::tab
     padding: 5px 14px;
 }
 
+QTableView,
 QTreeView,
 QTreeWidget,
 QListView
@@ -91,6 +92,7 @@ QListView
     outline: 0;
 }
 
+QTableView::item,
 QTreeView::item,
 QTreeWidget::item
 {

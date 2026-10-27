@@ -27,6 +27,32 @@ std::string read_theme(const char* path) {
 
 user_interface_t::user_interface_t(QWidget* parent) : QMainWindow(parent) {}
 
+void user_interface_t::set_engine(analysis_engine_t* engine) {
+    if (engine_)
+        disconnect(engine_, nullptr, this, nullptr);
+    engine_ = engine;
+    if (!engine_)
+        return;
+
+    connect(engine_, &analysis_engine_t::binary_ready, this, [this] {
+        show_disassembly_view();
+        statusBar()->showMessage("Disassembling...");
+    });
+    connect(engine_, &analysis_engine_t::instructions_ready, this, [this](instruction_batch_t batch) {
+        if (disassembly_view_)
+            disassembly_view_->append(std::move(batch));
+        statusBar()->showMessage(QStringLiteral("Disassembling: %1 instructions").arg(engine_->instruction_count()));
+    });
+    connect(engine_, &analysis_engine_t::load_finished, this, [this](bool success) {
+        if (success)
+            statusBar()->showMessage(QStringLiteral("Ready: %1 instructions").arg(engine_->instruction_count()));
+        else {
+            statusBar()->showMessage("Analysis could not complete; see Output for details");
+            log("analysis could not complete; the file may be invalid or its architecture unsupported");
+        }
+    });
+}
+
 bool user_interface_t::setup(const char* app_name, int width, int height) {
     setWindowTitle(app_name);
     resize(width, height);
@@ -64,19 +90,19 @@ bool user_interface_t::open_path(const QString& path) {
         log(QString::fromStdString(message));
     });
 
-    if (!engine_->load(path.toLocal8Bit().constData())) {
-        statusBar()->showMessage("failed to open: " + path);
-        return false;
+    // Remove views tied to the previous file before replacing its data.
+    for (auto* widget : {static_cast<QWidget*>(disassembly_view_), static_cast<QWidget*>(strings_view_),
+                         static_cast<QWidget*>(hex_view_)}) {
+        if (widget)
+            close_tab(main_views->indexOf(widget));
     }
+    hex_view_ = nullptr;
 
-    main_views->tabBar()->show();
-
-    // show_functions_view();
-    // show_hex_view();
-    show_disassembly_view();
+    if (!engine_->load(path.toLocal8Bit().constData()))
+        return false;
 
     setWindowTitle(QStringLiteral("decompatty - %1").arg(QFileInfo(path).fileName()));
-    statusBar()->showMessage("Opened: " + path);
+    statusBar()->showMessage("Loading: " + path);
     return true;
 }
 
@@ -87,12 +113,9 @@ disassembly_view_t* user_interface_t::show_disassembly_view() {
     if (!engine_ || !engine_->has_binary())
         return nullptr;
 
-    const auto* binary = engine_->binary();
-
-    if (binary->instructions().empty())
-        log("no instructions to disassemble, is an architecture plugin loaded?");
-
-    disassembly_view_ = new disassembly_view_t(binary->instructions(), binary->data(), this);
+    disassembly_view_ = new disassembly_view_t(engine_->shared_binary(), this);
+    for (const auto& batch : engine_->batches())
+        disassembly_view_->append(batch);
     disassembly_view_->setObjectName("disassembly_view");
 
     main_views->addTab(disassembly_view_, "Disassembly");
@@ -283,6 +306,9 @@ void user_interface_t::close_tab(int index) {
 
     if (widget == disassembly_view_)
         disassembly_view_ = nullptr;
+
+    else if (widget == hex_view_)
+        hex_view_ = nullptr;
 
     else if (widget == strings_view_)
         strings_view_ = nullptr;

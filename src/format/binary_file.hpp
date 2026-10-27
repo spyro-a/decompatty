@@ -10,6 +10,7 @@
 #include <functional>
 #include <memory>
 #include <span>
+#include <stop_token>
 #include <string>
 #include <vector>
 
@@ -39,6 +40,9 @@ struct instruction_t {
     std::uint8_t flags;
 };
 
+using instruction_batch_t = std::shared_ptr<const std::vector<instruction_t>>;
+using instruction_sink_t = std::function<bool(instruction_batch_t)>;
+
 using log_sink_t = std::function<void(const std::string&)>;
 
 using arch_resolver_t = const decompatty_arch_api* (*)(void* ctx, std::uint32_t cpu, std::uint32_t format);
@@ -46,6 +50,10 @@ using arch_resolver_t = const decompatty_arch_api* (*)(void* ctx, std::uint32_t 
 class binary_file_t {
 public:
     virtual ~binary_file_t() = default;
+
+    bool valid() const noexcept { return valid_; }
+
+    virtual bool disassemble(const instruction_sink_t& sink, std::stop_token stop = {}) { return false; }
 
     binary_format_t format() const noexcept { return format_; }
     cpu_type_t architecture() const noexcept { return architecture_; }
@@ -105,7 +113,8 @@ protected:
 
     static void arch_log_trampoline(void* ctx, const char* msg) {
         const auto* self = static_cast<const binary_file_t*>(ctx);
-        self->logger()(std::string(msg));
+        if (self->logger())
+            self->logger()(std::string(msg));
     }
 
     bool ensure_arch() {
@@ -121,10 +130,16 @@ protected:
         if (!api)
             return false;
 
+        const auto bits = bitness_ == bitness_t::bits_64 ? 64u : 32u;
+        const auto endian = endianness_ == endianness_t::little ? 1u : 2u;
+        if (api->bitness != bits || api->endianness != endian)
+            return false;
+
         arch_ = std::make_unique<arch_context_t>(api, arch_log_trampoline, this);
         return arch_->valid();
     }
 
+    bool valid_ = false;
     std::vector<std::byte> data_;
     binary_reader_t reader_;
 
@@ -149,4 +164,5 @@ private:
 
 std::unique_ptr<binary_file_t> open_binary(const char* path, log_sink_t logger = {},
                                            arch_resolver_t resolver = nullptr,
-                                           void* resolver_ctx = nullptr);
+                                           void* resolver_ctx = nullptr,
+                                           bool defer_disassembly = false);

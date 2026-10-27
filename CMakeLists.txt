@@ -57,3 +57,35 @@ foreach(arch IN LISTS DECOMPATTY_ARCHITECTURES)
 endforeach()
 
 add_dependencies(decompatty ${arch_plugins})
+add_executable(macho_tests EXCLUDE_FROM_ALL
+    tests/macho_tests.cpp
+    src/abi/arch_context.cpp
+    src/format/binary_file.cpp
+    src/format/binary_reader.cpp
+    src/format/macho/macho_file.cpp
+    src/utils/utils.cpp
+)
+target_include_directories(macho_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(macho_tests PRIVATE Qt6::Core)
+
+add_executable(disassembly_tests EXCLUDE_FROM_ALL
+    tests/disassembly_tests.cpp
+    src/ui/views/strings_view.cpp
+    src/abi/arch_context.cpp
+    src/format/binary_file.cpp
+    src/format/binary_reader.cpp
+    src/format/macho/macho_file.cpp
+    src/utils/utils.cpp
+)
+target_include_directories(disassembly_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(disassembly_tests PRIVATE Qt6::Widgets ${CMAKE_DL_LIBS})
+if(TARGET arch_x86_64)
+    add_dependencies(disassembly_tests arch_x86_64)
+endif()
+
+set(ASYNC_TEST_SOURCES ${DECOMPATTY_SOURCES})
+list(REMOVE_ITEM ASYNC_TEST_SOURCES src/main.cpp)
+add_executable(async_tests EXCLUDE_FROM_ALL tests/async_tests.cpp ${ASYNC_TEST_SOURCES})
+target_include_directories(async_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
+target_link_libraries(async_tests PRIVATE Qt6::Widgets ${CMAKE_DL_LIBS})
+add_dependencies(async_tests ${arch_plugins})

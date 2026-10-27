@@ -2,30 +2,31 @@
 
 #include <format/binary_file.hpp>
 
+#include <QAbstractTableModel>
 #include <QWidget>
-#include <QTreeWidgetItem>
 
-#include <span>
-#include <vector>
-
-class instruction_item_t : public QTreeWidgetItem {
+class disassembly_model_t : public QAbstractTableModel {
 public:
-    explicit instruction_item_t(QTreeWidget* parent) : QTreeWidgetItem(parent) {}
+    explicit disassembly_model_t(std::shared_ptr<const binary_file_t> binary, QObject* parent = nullptr);
 
-    bool operator<(const QTreeWidgetItem& other) const override {
-        const int column = treeWidget()->sortColumn();
+    int rowCount(const QModelIndex& parent = {}) const override;
+    int columnCount(const QModelIndex& parent = {}) const override;
+    QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
+    QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
+    void append(instruction_batch_t batch);
 
-        if (column == 0 || column == 1)
-            return data(column, Qt::UserRole).toULongLong()
-                 < other.data(column, Qt::UserRole).toULongLong();
-
-        return text(column) < other.text(column);
-    }
+private:
+    std::shared_ptr<const binary_file_t> binary_;
+    std::vector<instruction_batch_t> batches_;
+    std::vector<std::size_t> ends_;
 };
 
 class disassembly_view_t : public QWidget {
     Q_OBJECT
 public:
-    disassembly_view_t(const std::vector<instruction_t>& instructions,
-                       std::span<const std::byte> data, QWidget* parent = nullptr);
+    explicit disassembly_view_t(std::shared_ptr<const binary_file_t> binary, QWidget* parent = nullptr);
+    void append(instruction_batch_t batch);
+
+private:
+    disassembly_model_t* model_ = nullptr;
 };

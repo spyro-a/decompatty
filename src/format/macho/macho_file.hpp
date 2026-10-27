@@ -87,7 +87,7 @@ struct segment_section_64_t {
     std::string segment_name;
     std::uint64_t address;
     std::uint64_t size;
-    std::uint32_t file_offset;
+    std::uint64_t file_offset;
     std::uint32_t alignment;
     std::uint32_t relocation_offset;
     std::uint32_t relocation_count;
@@ -116,13 +116,29 @@ struct function_starts_command_t { // name should be changed in future
     std::uint32_t data_size;
 };
 
+struct macho_slice_t {
+    std::uint32_t cpu_type;
+    std::uint32_t cpu_subtype;
+    std::uint64_t file_offset;
+    std::uint64_t file_size;
+    std::uint32_t alignment;
+};
+
 class macho_file_t : public binary_file_t {
 public:
     explicit macho_file_t(
         std::vector<std::byte> data,
         log_sink_t logger = {},
         arch_resolver_t resolver = nullptr,
-        void* resolver_ctx = nullptr);
+        void* resolver_ctx = nullptr,
+        std::size_t slice_index = 0,
+        bool defer_disassembly = false);
+
+    bool disassemble(const instruction_sink_t& sink, std::stop_token stop = {}) override;
+
+    const std::vector<macho_slice_t>& slices() const {
+        return slices_;
+    }
 
     const std::vector<segment_command_64_t>& segments() const {
         return segments_;
@@ -145,6 +161,12 @@ public:
     }
 
 private:
+    bool defer_disassembly_ = false;
+    std::size_t slice_index_ = 0;
+    std::uint64_t slice_offset_ = 0;
+    std::size_t command_end_ = 0;
+    std::vector<macho_slice_t> slices_;
+
     std::uint32_t load_command_count = 0;
     std::uint32_t load_command_size = 0;
     std::size_t load_commands_begin = 0;
@@ -165,10 +187,11 @@ private:
     // LOAD command parsers
     void parse_main();
     void parse_function_start_addresses();
-    void parse_segment_64();
-    void parse_section_64();
+    void parse_segment(bool is_64);
+    void parse_section(bool is_64);
     void parse_cstrings(segment_section_64_t& section);
     void parse_text(segment_section_64_t& section);
+    bool disassemble_section(const segment_section_64_t& section, const instruction_sink_t& sink, std::stop_token stop);
 
     void parse_symtab();
 };

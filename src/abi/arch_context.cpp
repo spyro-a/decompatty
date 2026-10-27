@@ -19,11 +19,14 @@ arch_context_t::~arch_context_t() {
         api_->destroy(context_);
 }
 
-decompatty_status arch_context_t::disassemble(const decompatty_section& section) {
+decompatty_status arch_context_t::disassemble(const decompatty_section& section, bool quiet) {
     if (!context_)
         return DECOMPATTY_ERR_INVAL;
     
-    return api_->disassemble(context_, &section, &host_);
+    auto host = host_;
+    if (quiet)
+        host.log = nullptr;
+    return api_->disassemble(context_, &section, &host);
 }
 
 std::size_t arch_context_t::count() const noexcept {

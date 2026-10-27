@@ -15,7 +15,7 @@ class user_interface_t : public QMainWindow {
 public:
     explicit user_interface_t(QWidget* parent = nullptr);
 
-    inline void set_engine(analysis_engine_t* engine) noexcept { engine_ = engine; }
+    void set_engine(analysis_engine_t* engine);
     bool setup(const char* app_name, int width, int height);
     std::unordered_map<QString, QWidget*>& views();
 

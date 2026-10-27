@@ -17,7 +17,7 @@ public:
 
     bool valid() const noexcept { return context_ != nullptr; }
 
-    decompatty_status disassemble(const decompatty_section& section);
+    decompatty_status disassemble(const decompatty_section& section, bool quiet = false);
     std::size_t count() const noexcept;
     const decompatty_instruction* at(std::size_t index) const noexcept;
     const char* string(std::uint32_t offset) const noexcept;

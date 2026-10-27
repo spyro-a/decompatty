@@ -143,6 +143,7 @@ QTabBar::tab:selected
     color: #ffffff;
 } */
 
+QTableView,
 QTreeView,
 QTreeWidget,
 QListView
@@ -154,18 +155,21 @@ QListView
     selection-color: #ffffff;
 }
 
+QTableView::item,
 QTreeView::item,
 QTreeWidget::item
 {
     color: #d4d4d4;
 }
 
+QTableView::item:hover,
 QTreeView::item:hover,
 QTreeWidget::item:hover
 {
     background: #2a2d2e;
 }
 
+QTableView::item:selected,
 QTreeView::item:selected,
 QTreeWidget::item:selected
 {

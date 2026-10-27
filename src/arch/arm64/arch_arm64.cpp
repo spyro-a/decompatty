@@ -55,6 +55,8 @@ decompatty_status disassemble(void* context, const decompatty_section* section, 
 
     auto* ctx = static_cast<arm64_context_t*>(context);
     ctx->instructions.clear();
+    ctx->strings.clear();
+    ctx->string_index.clear();
     ctx->base = section->address;
 
     std::size_t decoded = 0;
