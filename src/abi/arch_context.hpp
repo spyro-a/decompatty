@@ -15,6 +15,8 @@ public:
     arch_context_t(const arch_context_t&) = delete;
     arch_context_t& operator=(const arch_context_t&) = delete;
 
+    const decompatty_arch_api* api() const noexcept { return api_; }
+
     bool valid() const noexcept { return context_ != nullptr; }
 
     decompatty_status disassemble(const decompatty_section& section, bool quiet = false);

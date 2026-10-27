@@ -236,3 +236,83 @@ QToolTip
     color: #d4d4d4;
     border: 1px solid #45454a;
 }
+
+disassembly_view_t
+{
+    qproperty-addressColor: #A0A9B8;
+    qproperty-bytesColor: #929CAA;
+    qproperty-labelColor: #79C6E8;
+    qproperty-mnemonicColor: #D8DEE9;
+    qproperty-registerColor: #89B8F5;
+    qproperty-immediateColor: #A8CC8C;
+    qproperty-controlColor: #C5A5ED;
+}
+
+QDialog
+{
+    background-color: #2b2b2b;
+}
+
+QLineEdit, QSpinBox, QComboBox
+{
+    background-color: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #45454a;
+    selection-background-color: #094771;
+    selection-color: #ffffff;
+    padding: 4px;
+}
+
+QLineEdit:focus
+{
+    border-color: #007acc;
+}
+
+QCheckBox
+{
+    spacing: 6px;
+}
+
+QCheckBox::indicator
+{
+    width: 12px;
+    height: 12px;
+    border: 1px solid #929caa;
+    border-radius: 2px;
+    background: #1e1e1e;
+}
+
+QCheckBox::indicator:checked
+{
+    background: #007acc;
+    border-color: #007acc;
+}
+
+QPushButton
+{
+    background-color: #333337;
+    color: #d4d4d4;
+    border: 1px solid #45454a;
+    border-radius: 3px;
+    padding: 4px 12px;
+}
+
+QPushButton:hover
+{
+    background-color: #3f3f46;
+}
+
+QPushButton:pressed
+{
+    background-color: #094771;
+}
+
+QPushButton:focus
+{
+    border-color: #007acc;
+}
+
+QPushButton:disabled
+{
+    color: #6d6d6d;
+}

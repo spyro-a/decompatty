@@ -8,6 +8,7 @@
 
 #include <QMainWindow>
 
+class QLabel;
 class analysis_engine_t;
 
 class user_interface_t : public QMainWindow {
@@ -16,6 +17,8 @@ public:
     explicit user_interface_t(QWidget* parent = nullptr);
 
     void set_engine(analysis_engine_t* engine);
+    bool set_theme(const QString& name);
+    QString theme_name() const { return theme_name_; }
     bool setup(const char* app_name, int width, int height);
     std::unordered_map<QString, QWidget*>& views();
 
@@ -24,6 +27,9 @@ public:
     void execute_command(const QString& command);
     void close_tab(int index);
 
+protected:
+    void closeEvent(QCloseEvent* event) override;
+
 private:
     disassembly_view_t* show_disassembly_view();
     functions_view_t* show_functions_view();
@@ -31,7 +37,9 @@ private:
     strings_view_t* show_strings_view();
     output_view_t* show_output_view();
 
+    void show_threading_settings();
     void apply_theme();
+    void save_theme();
     void setup_ui();
     void setup_menus();
     void setup_toolbar();
@@ -39,6 +47,10 @@ private:
 
     void log(const QString& message);
 
+
+    QString theme_directory_;
+    QString theme_name_ = "dark";
+    QLabel* app_title_ = nullptr;
 
     QTabWidget* main_views = nullptr;
 

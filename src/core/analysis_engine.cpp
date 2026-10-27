@@ -1,18 +1,57 @@
 #include <core/analysis_engine.hpp>
 
 #include <QMetaObject>
+#include <QSettings>
 
+#include <algorithm>
 #include <chrono>
 #include <exception>
 #include <semaphore>
 #include <utility>
+
+void threading_settings_t::normalize() noexcept {
+    workers = std::min(workers, 64u);
+    queued_batches = std::clamp(queued_batches, 1u, 64u);
+    if (batch_bytes != 4096 && batch_bytes != 16384 && batch_bytes != 65536)
+        batch_bytes = 16384;
+}
+
+unsigned threading_settings_t::worker_count() const noexcept {
+    if (!parallel)
+        return 1;
+    const auto available = std::max(1u, std::thread::hardware_concurrency());
+    return workers == 0 ? std::clamp(available - 1, 1u, 64u) : std::clamp(workers, 1u, 64u);
+}
+
+bool analysis_engine_t::set_threading_settings(threading_settings_t settings) {
+    settings.normalize();
+    QSettings saved(QSettings::defaultFormat(), QSettings::UserScope, "decompatty", "decompatty");
+    saved.beginGroup("threading");
+    saved.setValue("parallel", settings.parallel);
+    saved.setValue("workers", settings.workers);
+    saved.setValue("batch_bytes", settings.batch_bytes);
+    saved.setValue("queued_batches", settings.queued_batches);
+    saved.sync();
+    if (saved.status() != QSettings::NoError)
+        return false;
+    settings_ = settings;
+    return true;
+}
 
 const decompatty_arch_api* resolve_arch(void* ctx, std::uint32_t cpu, std::uint32_t format) {
     return static_cast<analysis_engine_t*>(ctx)->arch_loader().find(cpu, format);
 }
 
 analysis_engine_t::analysis_engine_t(QObject* parent)
-    : QObject(parent), worker_([this](std::stop_token stop) { work(stop); }) {}
+    : QObject(parent), worker_([this](std::stop_token stop) { work(stop); }) {
+    QSettings saved(QSettings::defaultFormat(), QSettings::UserScope, "decompatty", "decompatty");
+    saved.beginGroup("threading");
+    settings_.parallel = saved.value("parallel", false).toBool();
+    settings_.workers = saved.value("workers", 0).toUInt();
+    settings_.batch_bytes = saved.value("batch_bytes", 16384).toUInt();
+    settings_.queued_batches = saved.value("queued_batches", 8).toUInt();
+    settings_.normalize();
+}
 
 analysis_engine_t::~analysis_engine_t() {
     cancellation_.request_stop();
@@ -41,7 +80,7 @@ bool analysis_engine_t::load(const char* path) {
     loading_ = true;
     {
         std::lock_guard lock(mutex_);
-        pending_ = job_t{path, generation_, cancellation_.get_token()};
+        pending_ = job_t{path, generation_, cancellation_.get_token(), settings_};
     }
     wake_.notify_one();
     return true;
@@ -79,7 +118,7 @@ void analysis_engine_t::work(std::stop_token stop) {
                 }, Qt::QueuedConnection);
 
                 // Bound queued batches so decoding cannot overwhelm the event loop.
-                auto capacity = std::make_shared<std::counting_semaphore<8>>(8);
+                auto capacity = std::make_shared<std::counting_semaphore<64>>(job.settings.queued_batches);
                 success = file->disassemble([this, &job, capacity](instruction_batch_t batch) {
                     while (!capacity->try_acquire_for(std::chrono::milliseconds(10))) {
                         if (job.stop.stop_requested())
@@ -98,7 +137,7 @@ void analysis_engine_t::work(std::stop_token stop) {
                         emit instructions_ready(batch);
                     }, Qt::QueuedConnection);
                     return true;
-                }, job.stop);
+                }, job.stop, {job.settings.worker_count(), job.settings.batch_bytes});
             }
         } catch (const std::exception& error) {
             logger(std::string("analysis failed: ") + error.what());

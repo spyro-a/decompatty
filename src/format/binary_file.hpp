@@ -40,6 +40,11 @@ struct instruction_t {
     std::uint8_t flags;
 };
 
+struct disassembly_options_t {
+    std::size_t workers = 1;
+    std::size_t batch_bytes = 16384;
+};
+
 using instruction_batch_t = std::shared_ptr<const std::vector<instruction_t>>;
 using instruction_sink_t = std::function<bool(instruction_batch_t)>;
 
@@ -53,7 +58,7 @@ public:
 
     bool valid() const noexcept { return valid_; }
 
-    virtual bool disassemble(const instruction_sink_t& sink, std::stop_token stop = {}) { return false; }
+    virtual bool disassemble(const instruction_sink_t& sink, std::stop_token stop = {}, disassembly_options_t options = {}) { return false; }
 
     binary_format_t format() const noexcept { return format_; }
     cpu_type_t architecture() const noexcept { return architecture_; }

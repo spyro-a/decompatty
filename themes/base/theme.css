@@ -162,3 +162,14 @@ QScrollBar::sub-page
 {
     background: none;
 }
+
+QTableView#disassembly_table::item
+{
+    padding: 0;
+}
+
+QLabel#app_title
+{
+    font-weight: bold;
+    padding: 3px 8px;
+}

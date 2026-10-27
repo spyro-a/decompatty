@@ -13,6 +13,16 @@
 #include <string>
 #include <thread>
 
+struct threading_settings_t {
+    bool parallel = false;
+    unsigned workers = 0; // zero selects an automatic limit
+    unsigned batch_bytes = 16384;
+    unsigned queued_batches = 8;
+
+    unsigned worker_count() const noexcept;
+    void normalize() noexcept;
+};
+
 class analysis_engine_t : public QObject {
     Q_OBJECT
 public:
@@ -24,6 +34,8 @@ public:
     // Call from the UI thread. Results are delivered there through queued callbacks.
     bool load(const char* path);
     void cancel();
+    const threading_settings_t& threading_settings() const noexcept { return settings_; }
+    bool set_threading_settings(threading_settings_t settings);
 
     void set_logger(log_sink_t logger) noexcept {
         logger_ = std::move(logger);
@@ -65,10 +77,12 @@ private:
         std::string path;
         std::uint64_t generation;
         std::stop_token stop;
+        threading_settings_t settings;
     };
 
     void work(std::stop_token stop);
 
+    threading_settings_t settings_;
     std::shared_ptr<binary_file_t> binary_;
     std::vector<instruction_batch_t> batches_;
     std::size_t instruction_count_ = 0;

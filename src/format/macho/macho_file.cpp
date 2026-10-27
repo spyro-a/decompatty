@@ -3,6 +3,10 @@
 #include <format/macho/macho_file.hpp>
 
 #include <algorithm>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
 #include <cstdio>
 #include <limits>
 #include <stdexcept>
@@ -203,6 +207,30 @@ void macho_file_t::parse_function_start_addresses() {
     function_starts_command_t function_starts;
     function_starts.data_offset = reader_.u32();
     function_starts.data_size = reader_.u32();
+    const auto data = reader_.read_at(function_starts.data_offset, function_starts.data_size);
+    std::uint64_t address = 0;
+    std::uint64_t delta = 0;
+    unsigned shift = 0;
+    for (const auto value : data) {
+        const auto byte = std::to_integer<std::uint8_t>(value);
+        if (shift >= 64 || (shift == 63 && (byte & 0x7F) > 1))
+            throw std::out_of_range("Mach-O function start delta overflow");
+        delta |= std::uint64_t(byte & 0x7F) << shift;
+        if (byte & 0x80) {
+            shift += 7;
+            continue;
+        }
+        if (delta == 0)
+            return; // terminator
+        if (delta > std::numeric_limits<std::uint64_t>::max() - address)
+            throw std::out_of_range("Mach-O function start address overflow");
+        address += delta;
+        function_start_offsets_.push_back(address);
+        delta = 0;
+        shift = 0;
+    }
+    if (!data.empty())
+        throw std::out_of_range("unterminated Mach-O function starts");
 }
 
 void macho_file_t::parse_segment(bool is_64) {
@@ -306,52 +334,188 @@ void macho_file_t::parse_text(segment_section_64_t& section) {
     }, {});
 }
 
-bool macho_file_t::disassemble(const instruction_sink_t& sink, std::stop_token stop) {
+bool macho_file_t::disassemble(const instruction_sink_t& sink, std::stop_token stop, disassembly_options_t options) {
     if (!valid_ || !sink)
         return false;
 
     for (const auto& section : sections_) {
         if (stop.stop_requested())
             return false;
-        if (section.section_name == "__text" && !disassemble_section(section, sink, stop))
+        if (section.section_name == "__text" && !disassemble_section(section, sink, stop, options))
             return false;
     }
     return !stop.stop_requested();
 }
 
+namespace {
+    struct decode_packet_t {
+        instruction_batch_t batch;
+        bool finished = false;
+        bool success = false;
+    };
+
+    struct decode_lane_t {
+        std::mutex mutex;
+        std::condition_variable_any changed;
+        std::deque<decode_packet_t> packets;
+
+        bool push(decode_packet_t packet, std::stop_token stop) {
+            std::unique_lock lock(mutex);
+            if (!changed.wait(lock, stop, [this] { return packets.size() < 2; }))
+                return false;
+            packets.push_back(std::move(packet));
+            lock.unlock();
+            changed.notify_all();
+            return true;
+        }
+
+        bool pop(decode_packet_t& packet, std::stop_token stop) {
+            std::unique_lock lock(mutex);
+            if (!changed.wait(lock, stop, [this] { return !packets.empty(); }))
+                return false;
+            packet = std::move(packets.front());
+            packets.pop_front();
+            lock.unlock();
+            changed.notify_all();
+            return true;
+        }
+    };
+
+    struct decode_pipeline_t {
+        std::stop_source stop;
+        std::vector<std::unique_ptr<decode_lane_t>> lanes;
+        std::vector<std::jthread> workers;
+
+        ~decode_pipeline_t() {
+            // Stop-aware queue waits wake before the worker threads are joined.
+            stop.request_stop();
+        }
+    };
+}
+
 bool macho_file_t::disassemble_section(const segment_section_64_t& section,
-                                       const instruction_sink_t& sink, std::stop_token stop) {
+                                       const instruction_sink_t& sink, std::stop_token stop,
+                                       disassembly_options_t options) {
     if (section.data.empty())
         return true;
-
     if (!ensure_arch()) {
         log("no compatible architecture plugin for cpu 0x%02X", static_cast<unsigned>(architecture_));
         return false;
     }
 
-    constexpr std::size_t chunk_size = 16384;
-    constexpr std::size_t lookahead = 15; // maximum x86 instruction size
-    std::size_t offset = 0;
+    const auto chunk_size = std::clamp<std::size_t>(options.batch_bytes, 4096, 65536) & ~std::size_t{3};
+    std::vector<std::pair<std::size_t, std::size_t>> ranges;
+    std::size_t begin = 0;
+    // Use the same ranges in every mode so worker count and UI batch size
+    // cannot change the decoder's synchronization boundaries.
+    constexpr std::size_t range_bytes = 65536;
+    if (architecture_ == cpu_type_t::arm64) {
+        for (std::size_t end = range_bytes; end < section.data.size(); end += range_bytes) {
+            ranges.emplace_back(begin, end);
+            begin = end;
+        }
+    } else if (architecture_ == cpu_type_t::x86_64) {
+        const auto text = std::find_if(segments_.begin(), segments_.end(), [](const auto& segment) {
+            return segment.segment_name == "__TEXT";
+        });
+        if (text != segments_.end()) {
+            for (const auto offset : function_start_offsets_) {
+                if (offset > std::numeric_limits<std::uint64_t>::max() - text->address)
+                    break;
+                const auto address = text->address + offset;
+                if (address <= section.address || address - section.address >= section.data.size())
+                    continue;
+                const auto end = static_cast<std::size_t>(address - section.address);
+                if (end > begin && end - begin >= range_bytes) {
+                    ranges.emplace_back(begin, end);
+                    begin = end;
+                }
+            }
+        }
+    }
+    ranges.emplace_back(begin, section.data.size());
+    const auto workers = std::clamp<std::size_t>(options.workers, 1, std::min<std::size_t>(64, ranges.size()));
+    log("%s: using %zu decoder worker%s", section.section_name.c_str(), workers, workers == 1 ? "" : "s");
+    if (options.workers > 1 && workers == 1 && architecture_ == cpu_type_t::x86_64)
+        log("parallel decoding needs sufficient Mach-O function boundaries; using one decoder for this section");
+
     std::size_t total = 0;
-    while (offset < section.data.size()) {
+    auto deliver = [&](instruction_batch_t batch) {
+        total += batch->size();
+        return sink(std::move(batch));
+    };
+    if (workers == 1) {
+        for (const auto& [begin, end] : ranges)
+            if (!disassemble_range(section, begin, end, *arch_, deliver, stop, chunk_size))
+                return false;
+    } else {
+        decode_pipeline_t pipeline;
+        std::stop_callback cancelled(stop, [&] { pipeline.stop.request_stop(); });
+        const auto token = pipeline.stop.get_token();
+        for (std::size_t i = 0; i < workers; ++i)
+            pipeline.lanes.push_back(std::make_unique<decode_lane_t>());
+        for (std::size_t i = 0; i < workers; ++i) {
+            pipeline.workers.emplace_back([&, i, token] {
+                auto& lane = *pipeline.lanes[i];
+                try {
+                    // Each worker owns a decoder; plugin contexts are never shared.
+                    arch_context_t decoder(arch_->api(), nullptr, nullptr);
+                    for (std::size_t task = i; task < ranges.size() && !token.stop_requested(); task += workers) {
+                        const auto [begin, end] = ranges[task];
+                        const bool success = decoder.valid() && disassemble_range(section, begin, end, decoder,
+                            [&](instruction_batch_t batch) { return lane.push({std::move(batch)}, token); }, token, chunk_size);
+                        if (!lane.push({{}, true, success}, token) || !success)
+                            return;
+                    }
+                } catch (const std::exception&) {
+                    lane.push({{}, true, false}, token);
+                }
+            });
+        }
+        // Drain tasks in address order while later tasks decode into bounded queues.
+        for (std::size_t task = 0; task < ranges.size(); ++task) {
+            auto& lane = *pipeline.lanes[task % workers];
+            decode_packet_t packet;
+            do {
+                if (!lane.pop(packet, token))
+                    return false;
+                if (packet.finished) {
+                    if (!packet.success)
+                        return false;
+                } else if (stop.stop_requested() || !deliver(std::move(packet.batch))) {
+                    return false;
+                }
+            } while (!packet.finished);
+        }
+    }
+    log("%s: %zu instructions decoded", section.section_name.c_str(), total);
+    return !stop.stop_requested();
+}
+
+bool macho_file_t::disassemble_range(const segment_section_64_t& section, std::size_t begin, std::size_t end,
+                                     arch_context_t& decoder, const instruction_sink_t& sink,
+                                     std::stop_token stop, std::size_t chunk_size) {
+    constexpr std::size_t lookahead = 15; // maximum x86 instruction size
+    std::size_t offset = begin;
+    while (offset < end) {
         if (stop.stop_requested())
             return false;
 
-        const auto remaining = section.data.size() - offset;
+        const auto remaining = end - offset;
         decompatty_section input{};
         input.data = reinterpret_cast<const std::uint8_t*>(section.data.data() + offset);
         input.length = std::min(remaining, chunk_size + lookahead);
         input.address = section.address + offset;
         input.file_offset = section.file_offset + offset;
         input.section_name = section.section_name.c_str();
-        if (arch_->disassemble(input, true) != DECOMPATTY_OK)
+        if (decoder.disassemble(input, true) != DECOMPATTY_OK)
             return false;
 
         auto batch = std::make_shared<std::vector<instruction_t>>();
-        batch->reserve(arch_->count());
+        batch->reserve(decoder.count());
         std::size_t consumed = 0;
-        for (std::size_t i = 0; i < arch_->count(); ++i) {
-            const auto* raw = arch_->at(i);
+        for (std::size_t i = 0; i < decoder.count(); ++i) {
+            const auto* raw = decoder.at(i);
             if (!raw || raw->section_offset >= chunk_size)
                 break;
             if (raw->section_offset != consumed || raw->length == 0 ||
@@ -360,8 +524,8 @@ bool macho_file_t::disassemble_section(const segment_section_64_t& section,
 
             instruction_t instruction;
             instruction.address = raw->address;
-            instruction.mnemonic = arch_->string(raw->mnemonic_offset);
-            instruction.operands = arch_->string(raw->operands_offset);
+            instruction.mnemonic = decoder.string(raw->mnemonic_offset);
+            instruction.operands = decoder.string(raw->operands_offset);
             instruction.file_offset = input.file_offset + raw->section_offset;
             instruction.length = raw->length;
             instruction.flags = raw->flags;
@@ -369,12 +533,10 @@ bool macho_file_t::disassemble_section(const segment_section_64_t& section,
             consumed += raw->length;
         }
 
-        total += batch->size();
         if (consumed == 0 || stop.stop_requested() || !sink(std::move(batch)))
             return false;
         offset += consumed;
     }
-    log("%s: %zu instructions decoded", section.section_name.c_str(), total);
     return true;
 }
 

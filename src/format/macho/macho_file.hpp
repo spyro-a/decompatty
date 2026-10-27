@@ -134,7 +134,7 @@ public:
         std::size_t slice_index = 0,
         bool defer_disassembly = false);
 
-    bool disassemble(const instruction_sink_t& sink, std::stop_token stop = {}) override;
+    bool disassemble(const instruction_sink_t& sink, std::stop_token stop = {}, disassembly_options_t options = {}) override;
 
     const std::vector<macho_slice_t>& slices() const {
         return slices_;
@@ -161,6 +161,7 @@ public:
     }
 
 private:
+    std::vector<std::uint64_t> function_start_offsets_;
     bool defer_disassembly_ = false;
     std::size_t slice_index_ = 0;
     std::uint64_t slice_offset_ = 0;
@@ -191,7 +192,11 @@ private:
     void parse_section(bool is_64);
     void parse_cstrings(segment_section_64_t& section);
     void parse_text(segment_section_64_t& section);
-    bool disassemble_section(const segment_section_64_t& section, const instruction_sink_t& sink, std::stop_token stop);
+    bool disassemble_section(const segment_section_64_t& section, const instruction_sink_t& sink, std::stop_token stop,
+                             disassembly_options_t options = {});
+    bool disassemble_range(const segment_section_64_t& section, std::size_t begin, std::size_t end,
+                           arch_context_t& decoder, const instruction_sink_t& sink,
+                           std::stop_token stop, std::size_t chunk_size);
 
     void parse_symtab();
 };

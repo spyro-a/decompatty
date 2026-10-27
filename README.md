@@ -75,3 +75,34 @@ Threading and incremental display checks:
 cmake --build build --target async_tests
 QT_QPA_PLATFORM=offscreen ./build/async_tests ./build/arch
 ```
+
+The disassembly listing uses segment-prefixed addresses, separate symbol labels,
+and syntax colors for registers, constants, and control flow. Toggle **Opcode
+bytes** to show the encoding, press **G** to jump to an already decoded address,
+and use **Ctrl+C** / **Cmd+C** to copy the selected line.
+
+Choose **View → Theme** to switch between Dark, Light, Nord, Dracula, Gruvbox,
+and Solarized. The selected theme is saved when the app exits and restored on
+the next launch, with Dark as the fallback if it is unavailable. Themes live in `themes/<name>/theme.css` and share the layout rules
+in `themes/base/theme.css`. Add another theme directory to include it in the menu
+on the next launch. The application can load its bundled themes from any working
+directory; a local `themes` directory takes precedence.
+
+Disassembly syntax is styled through `disassembly_view_t` properties:
+`qproperty-addressColor`, `qproperty-bytesColor`, `qproperty-labelColor`,
+`qproperty-mnemonicColor`, `qproperty-registerColor`, `qproperty-immediateColor`,
+and `qproperty-controlColor`. Omitted colors fall back to the text palette;
+selection follows the theme's highlighted text color.
+
+Open **Edit → Threading settings…** to enable parallel disassembly, choose an
+explicit worker limit (1–64) or Automatic, set the decode batch size (4, 16, or
+64 KiB), and limit pending UI updates (1–64). Settings are saved per user and
+apply when the next file opens. Parallel disassembly is off by default; parsing
+and decoding still use a background worker so the UI remains responsive.
+
+ARM64 work is divided at fixed-width instruction boundaries. x86_64 work uses
+`LC_FUNCTION_STARTS` boundaries and falls back to one decoder when sufficient
+boundaries are unavailable. Each worker owns its decoder, and results reach the
+listing in address order through bounded queues. Automatic uses up to the logical
+CPU count minus one, with a minimum of one and a maximum of 64 decoder workers.
+The Output pane reports the actual decoder count used for each section.
